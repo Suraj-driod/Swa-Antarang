@@ -28,7 +28,7 @@ import Track from '../../features/merchant/Track';
 import DashboardDelivery from '../../features/driver/DashboardDelivery';
 import DashboardOrders from '../../features/driver/DeliveryOrders';
 import DashboardHistory from '../../features/driver/DeliveryHistory';
-import DashboardCustomer from '../../features/driver/DeliveryCustomers';
+import DriverMapsPage from '../../pages/driver/DriverMapsPage';
 
 // --- Customer Pages ---
 import CustomerApp from '../../features/customer/CustomerApp';
@@ -63,7 +63,7 @@ export default function AppRouter() {
                                     <Route path="/driver/DashboardDelivery" element={<DashboardDelivery />} />
                                     <Route path="/driver/DashboardOrders" element={<DashboardOrders />} />
                                     <Route path="/driver/DashboardHistory" element={<DashboardHistory />} />
-                                    <Route path="/driver/DashboardCustomer" element={<DashboardCustomer />} />
+                                    <Route path="/driver/maps" element={<DriverMapsPage />} />
                                 </Route>
                             </Route>
 

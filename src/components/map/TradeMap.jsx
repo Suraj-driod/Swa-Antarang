@@ -132,24 +132,24 @@ function FloatingPanel({ deliveryPoints, isOptimized, onOptimize }) {
   return (
     <div className="absolute bottom-6 left-4 right-4 z-[1000] pointer-events-none">
       <div className="bg-white/90 backdrop-blur-xl p-5 rounded-[28px] shadow-2xl border border-white/50 pointer-events-auto flex flex-col gap-4">
-        
+
         {/* Header Info */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-             <div className="w-12 h-12 bg-[#fdf2f6] rounded-2xl flex items-center justify-center text-[#59112e] shadow-inner">
-                <MapPin size={24} fill="#59112e" fillOpacity={0.1} />
-             </div>
-             <div>
-                <h3 className="font-bold text-slate-800 text-lg leading-tight">Delivery Route</h3>
-                <p className="text-xs text-slate-500 font-medium">
-                  {deliveryPoints.length} Stops • Est. 45 mins
-                </p>
-             </div>
+            <div className="w-12 h-12 bg-[#fdf2f6] rounded-2xl flex items-center justify-center text-[#59112e] shadow-inner">
+              <MapPin size={24} fill="#59112e" fillOpacity={0.1} />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-800 text-lg leading-tight">Delivery Route</h3>
+              <p className="text-xs text-slate-500 font-medium">
+                {deliveryPoints.length} Stops • Est. 45 mins
+              </p>
+            </div>
           </div>
           {isOptimized && (
-             <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border border-emerald-200">
-               Optimized
-             </span>
+            <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border border-emerald-200">
+              Optimized
+            </span>
           )}
         </div>
 
@@ -157,8 +157,8 @@ function FloatingPanel({ deliveryPoints, isOptimized, onOptimize }) {
         <button
           onClick={onOptimize}
           className={`w-full py-4 rounded-xl font-bold text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2
-            ${!isOptimized 
-              ? 'bg-[#59112e] text-white shadow-[#59112e]/25 hover:bg-[#450d24]' 
+            ${!isOptimized
+              ? 'bg-[#59112e] text-white shadow-[#59112e]/25 hover:bg-[#450d24]'
               : 'bg-emerald-500 text-white shadow-emerald-500/30 hover:bg-emerald-600'
             }`}
         >
@@ -183,6 +183,7 @@ export default function RouteMap({
     { id: 2, lat: 28.632, lng: 77.225, address: "New Delhi Rly Stn", priority: false },
     { id: 3, lat: 28.610, lng: 77.230, address: "India Gate", priority: false }
   ],
+  showDefaultPanel = true,
 }) {
   const [isOptimized, setIsOptimized] = useState(false);
   const [routePath, setRoutePath] = useState([]);
@@ -201,16 +202,16 @@ export default function RouteMap({
     // Mock optimization: simply redraws path with new style, 
     // real app would reorder 'deliveryPoints' and fetch Directions API geometry
     const optimized = [
-        [driverLocation.lat, driverLocation.lng],
-        // Simulating a slightly different path geometry for visual flair
-        [driverLocation.lat + 0.005, driverLocation.lng + 0.002], 
-        ...deliveryPoints.map(p => [p.lat, p.lng])
+      [driverLocation.lat, driverLocation.lng],
+      // Simulating a slightly different path geometry for visual flair
+      [driverLocation.lat + 0.005, driverLocation.lng + 0.002],
+      ...deliveryPoints.map(p => [p.lat, p.lng])
     ];
     setRoutePath(optimized);
   };
 
   return (
-    <div className="w-full h-screen relative bg-slate-100 overflow-hidden font-outfit">
+    <div className="w-full h-full relative bg-slate-100 overflow-hidden font-outfit">
       <MapStyles /> {/* Inject CSS */}
 
       <MapContainer
@@ -229,22 +230,22 @@ export default function RouteMap({
 
         {/* Driver Pin */}
         <Marker position={[driverLocation.lat, driverLocation.lng]} icon={createDriverIcon()} zIndexOffset={1000}>
-           <Popup className="font-outfit font-bold text-[#59112e]">You are here</Popup>
+          <Popup className="font-outfit font-bold text-[#59112e]">You are here</Popup>
         </Marker>
 
         {/* Stops */}
         {deliveryPoints.map((pt, idx) => (
-          <Marker 
-            key={pt.id} 
-            position={[pt.lat, pt.lng]} 
+          <Marker
+            key={pt.id}
+            position={[pt.lat, pt.lng]}
             icon={createStopIcon(idx, pt.priority, isOptimized)}
           >
             <Popup className="font-outfit">
-               <div className="p-1">
-                 <p className="text-xs text-slate-400 font-bold uppercase mb-1">Stop {idx + 1}</p>
-                 <p className="font-bold text-slate-800 text-sm">{pt.address}</p>
-                 {pt.priority && <p className="text-[10px] text-rose-500 font-bold mt-1">★ Priority Delivery</p>}
-               </div>
+              <div className="p-1">
+                <p className="text-xs text-slate-400 font-bold uppercase mb-1">Stop {idx + 1}</p>
+                <p className="font-bold text-slate-800 text-sm">{pt.address}</p>
+                {pt.priority && <p className="text-[10px] text-rose-500 font-bold mt-1">★ Priority Delivery</p>}
+              </div>
             </Popup>
           </Marker>
         ))}
@@ -256,18 +257,20 @@ export default function RouteMap({
 
       {/* Top Left Badge */}
       <div className="absolute top-4 left-4 z-[1000] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-white/50 flex items-center gap-2">
-         <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
-         </span>
-         <span className="text-xs font-bold text-[#59112e]">Live Tracking</span>
+        <span className="relative flex h-3 w-3">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+        </span>
+        <span className="text-xs font-bold text-[#59112e]">Live Tracking</span>
       </div>
 
-      <FloatingPanel 
-        deliveryPoints={deliveryPoints} 
-        isOptimized={isOptimized} 
-        onOptimize={handleOptimize} 
-      />
+      {showDefaultPanel && (
+        <FloatingPanel
+          deliveryPoints={deliveryPoints}
+          isOptimized={isOptimized}
+          onOptimize={handleOptimize}
+        />
+      )}
     </div>
   );
 }
