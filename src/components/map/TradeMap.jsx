@@ -1,277 +1,273 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
-    MapContainer,
-    TileLayer,
-    Marker,
-    Polyline,
-    Popup,
-    useMap,
+  MapContainer,
+  TileLayer,
+  Marker,
+  Polyline,
+  Popup,
+  useMap,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { Zap, Navigation, MapPin, Package, Clock } from "lucide-react";
 
-// ─── Custom Marker Icons (SVG data-URIs to avoid bundler issues) ────────────
+// ─── 1. Custom CSS for Map Styling ──────────────────────────────────────
+// This style tag creates the "Cinematic" map look and marker animations
+const MapStyles = () => (
+  <style>{`
+    /* Desaturate the map tiles to make our colors pop */
+    .cinematic-tiles {
+      filter: grayscale(0.8) contrast(1.1) brightness(1.05);
+    }
+    
+    /* Driver Pulse Animation */
+    @keyframes radar-pulse {
+      0% { box-shadow: 0 0 0 0 rgba(89, 17, 46, 0.6); }
+      70% { box-shadow: 0 0 0 15px rgba(89, 17, 46, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(89, 17, 46, 0); }
+    }
+    .driver-marker-pulse {
+      animation: radar-pulse 2s infinite;
+    }
 
-const makeIcon = (color, size = 32) =>
-    L.divIcon({
-        className: "",
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size],
-        popupAnchor: [0, -size],
-        html: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" stroke="#fff" stroke-width="1.5"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg>`,
-    });
+    /* Route Flow Animation */
+    @keyframes dash-flow {
+      to { stroke-dashoffset: -20; }
+    }
+    .route-flow-line {
+      animation: dash-flow 1s linear infinite;
+    }
+  `}</style>
+);
 
-const DRIVER_ICON = makeIcon("#3b82f6", 36); // blue
-const DELIVERY_ICON = makeIcon("#ef4444", 30); // red
+// ─── 2. Advanced Marker Generators ──────────────────────────────────────
 
-// ─── Haversine distance (km) — mock-friendly ────────────────────────────────
+// Driver Icon: A "Navigation Puck" style with a pulsing ring
+const createDriverIcon = () => {
+  return L.divIcon({
+    className: "bg-transparent",
+    iconSize: [48, 48],
+    iconAnchor: [24, 24],
+    html: `
+      <div class="relative w-full h-full flex items-center justify-center">
+        <div class="absolute inset-0 rounded-full bg-[#59112e]/30 driver-marker-pulse"></div>
+        <div class="relative w-10 h-10 bg-[#59112e] border-[3px] border-white rounded-full shadow-xl flex items-center justify-center z-10">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="3 11 22 2 13 21 11 13 3 11" fill="white" fill-opacity="0.2"/>
+          </svg>
+        </div>
+      </div>
+    `,
+  });
+};
 
-function haversine(a, b) {
-    const R = 6371;
-    const toRad = (d) => (d * Math.PI) / 180;
-    const dLat = toRad(b[0] - a[0]);
-    const dLng = toRad(b[1] - a[1]);
-    const x =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(a[0])) * Math.cos(toRad(b[0])) * Math.sin(dLng / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
-}
+// Stop Icon: A "Lollipop" pin with index number and status colors
+const createStopIcon = (index, isPriority, isOptimized) => {
+  const bgColor = isPriority ? "#be185d" : (isOptimized ? "#59112e" : "#ffffff");
+  const textColor = isPriority || isOptimized ? "#ffffff" : "#59112e";
+  const borderColor = isPriority ? "#fbcfe8" : "#59112e";
 
-// ─── MapController — auto-center & fit bounds ───────────────────────────────
+  return L.divIcon({
+    className: "bg-transparent",
+    iconSize: [40, 50],
+    iconAnchor: [20, 50], // Tip of the pin at the bottom
+    popupAnchor: [0, -50],
+    html: `
+      <div class="relative w-full h-full flex flex-col items-center justify-end drop-shadow-lg group hover:scale-110 transition-transform">
+        <div class="w-8 h-8 rounded-full border-[3px] flex items-center justify-center text-sm font-bold shadow-sm z-10" 
+             style="background-color: ${bgColor}; color: ${textColor}; border-color: ${borderColor};">
+          ${index + 1}
+        </div>
+        <div class="w-1 h-3 bg-[#59112e] rounded-b-full"></div>
+        <div class="absolute -bottom-1 w-8 h-2 bg-black/20 blur-[2px] rounded-full"></div>
+      </div>
+    `,
+  });
+};
+
+// ─── 3. Functional Components ───────────────────────────────────────────
 
 function MapController({ driverLocation, deliveryPoints }) {
-    const map = useMap();
-
-    useEffect(() => {
-        if (!driverLocation) return;
-
-        if (deliveryPoints?.length) {
-            const pts = [
-                [driverLocation.lat, driverLocation.lng],
-                ...deliveryPoints.map((p) => [p.lat, p.lng]),
-            ];
-            map.fitBounds(pts, { padding: [40, 40], maxZoom: 15 });
-        } else {
-            map.setView([driverLocation.lat, driverLocation.lng], 14);
-        }
-    }, [driverLocation?.lat, driverLocation?.lng, deliveryPoints, map]);
-
-    return null;
+  const map = useMap();
+  useEffect(() => {
+    if (!driverLocation) return;
+    const points = [[driverLocation.lat, driverLocation.lng], ...deliveryPoints.map(p => [p.lat, p.lng])];
+    map.fitBounds(points, { padding: [60, 60], maxZoom: 15, animate: true });
+  }, [driverLocation, deliveryPoints, map]);
+  return null;
 }
 
-// ─── DriverMarker — with optional live-location simulation ──────────────────
+function RouteLayer({ positions, isOptimized }) {
+  if (!positions?.length) return null;
 
-function DriverMarker({ location, simulate }) {
-    const [pos, setPos] = useState(location);
-    const intervalRef = useRef(null);
-
-    useEffect(() => {
-        setPos(location);
-    }, [location]);
-
-    useEffect(() => {
-        if (!simulate) return;
-        intervalRef.current = setInterval(() => {
-            setPos((p) => ({
-                lat: p.lat + (Math.random() - 0.45) * 0.0003,
-                lng: p.lng + (Math.random() - 0.45) * 0.0003,
-            }));
-        }, 1500);
-        return () => clearInterval(intervalRef.current);
-    }, [simulate]);
-
-    return (
-        <Marker position={[pos.lat, pos.lng]} icon={DRIVER_ICON}>
-            <Popup>Driver</Popup>
-        </Marker>
-    );
+  return (
+    <>
+      {/* Glow Layer */}
+      <Polyline
+        positions={positions}
+        pathOptions={{
+          color: isOptimized ? "#fbcfe8" : "#94a3b8",
+          weight: 10,
+          opacity: 0.5,
+          lineCap: "round",
+          lineJoin: "round"
+        }}
+      />
+      {/* Core Line */}
+      <Polyline
+        positions={positions}
+        pathOptions={{
+          color: isOptimized ? "#59112e" : "#64748b",
+          weight: 4,
+          opacity: 1,
+          dashArray: isOptimized ? "10 10" : undefined,
+          className: isOptimized ? "route-flow-line" : "" // Applies CSS animation
+        }}
+      />
+    </>
+  );
 }
 
-// ─── DeliveryMarkers ────────────────────────────────────────────────────────
+function FloatingPanel({ deliveryPoints, isOptimized, onOptimize }) {
+  return (
+    <div className="absolute bottom-6 left-4 right-4 z-[1000] pointer-events-none">
+      <div className="bg-white/90 backdrop-blur-xl p-5 rounded-[28px] shadow-2xl border border-white/50 pointer-events-auto flex flex-col gap-4">
+        
+        {/* Header Info */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+             <div className="w-12 h-12 bg-[#fdf2f6] rounded-2xl flex items-center justify-center text-[#59112e] shadow-inner">
+                <MapPin size={24} fill="#59112e" fillOpacity={0.1} />
+             </div>
+             <div>
+                <h3 className="font-bold text-slate-800 text-lg leading-tight">Delivery Route</h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  {deliveryPoints.length} Stops • Est. 45 mins
+                </p>
+             </div>
+          </div>
+          {isOptimized && (
+             <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border border-emerald-200">
+               Optimized
+             </span>
+          )}
+        </div>
 
-function DeliveryMarkers({ points, draggable, onReorder }) {
-    const handleDragEnd = useCallback(
-        (idx, e) => {
-            if (!onReorder) return;
-            const { lat, lng } = e.target.getLatLng();
-            const updated = points.map((p, i) =>
-                i === idx ? { ...p, lat, lng } : p
-            );
-            // simple reorder: sort by distance to first point
-            const origin = updated[0];
-            const sorted = [...updated].sort(
-                (a, b) =>
-                    haversine([origin.lat, origin.lng], [a.lat, a.lng]) -
-                    haversine([origin.lat, origin.lng], [b.lat, b.lng])
-            );
-            onReorder(sorted.map((s) => s.id));
-        },
-        [points, onReorder]
-    );
-
-    return points.map((pt, idx) => (
-        <Marker
-            key={pt.id}
-            position={[pt.lat, pt.lng]}
-            icon={DELIVERY_ICON}
-            draggable={draggable}
-            eventHandlers={
-                draggable ? { dragend: (e) => handleDragEnd(idx, e) } : undefined
-            }
+        {/* Dynamic Button */}
+        <button
+          onClick={onOptimize}
+          className={`w-full py-4 rounded-xl font-bold text-sm shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2
+            ${!isOptimized 
+              ? 'bg-[#59112e] text-white shadow-[#59112e]/25 hover:bg-[#450d24]' 
+              : 'bg-emerald-500 text-white shadow-emerald-500/30 hover:bg-emerald-600'
+            }`}
         >
-            <Popup>
-                <span className="font-semibold">{pt.address}</span>
-                {pt.priority != null && (
-                    <span className="block text-xs text-gray-400">
-                        Priority: {pt.priority}
-                    </span>
-                )}
-            </Popup>
-        </Marker>
-    ));
+          {!isOptimized ? (
+            <><Zap size={18} fill="currentColor" /> Optimize & Start Route</>
+          ) : (
+            <><Navigation size={18} /> Navigation Active</>
+          )}
+        </button>
+
+      </div>
+    </div>
+  );
 }
 
-// ─── RoutePolyline ──────────────────────────────────────────────────────────
+// ─── 4. Main Export ─────────────────────────────────────────────────────
 
-function RoutePolylineLayer({ positions }) {
-    if (!positions?.length) return null;
-    return (
-        <Polyline
-            positions={positions}
-            pathOptions={{ color: "#6366f1", weight: 4, opacity: 0.8 }}
-        />
-    );
-}
-
-// ─── DriverPanel (bottom floating) ──────────────────────────────────────────
-
-function DriverPanel({ deliveryPoints, routePolyline }) {
-    const remaining = deliveryPoints?.length ?? 0;
-
-    const totalDistance = useMemo(() => {
-        if (!routePolyline || routePolyline.length < 2) return 0;
-        let d = 0;
-        for (let i = 1; i < routePolyline.length; i++) {
-            d += haversine(routePolyline[i - 1], routePolyline[i]);
-        }
-        return d.toFixed(1);
-    }, [routePolyline]);
-
-    const [started, setStarted] = useState(false);
-
-    return (
-        <div className="absolute bottom-0 left-0 right-0 z-[1000] pointer-events-none">
-            <div className="mx-3 mb-4 rounded-2xl bg-gray-900/90 backdrop-blur-lg border border-gray-700/50 p-4 pointer-events-auto shadow-2xl">
-                {/* Stats row */}
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-indigo-500/20 text-indigo-400 text-sm font-bold">
-                            {remaining}
-                        </span>
-                        <span className="text-sm text-gray-300">stops left</span>
-                    </div>
-                    <div className="text-sm text-gray-400">
-                        ~<span className="text-white font-medium">{totalDistance}</span> km
-                    </div>
-                </div>
-
-                {/* Action button */}
-                <button
-                    onClick={() => setStarted((s) => !s)}
-                    className={`w-full py-3 rounded-xl font-semibold text-sm transition-all active:scale-[.97] ${started
-                            ? "bg-red-500 hover:bg-red-600 text-white"
-                            : "bg-indigo-500 hover:bg-indigo-600 text-white"
-                        }`}
-                >
-                    {started ? "Stop Delivery" : "Start Delivery"}
-                </button>
-            </div>
-        </div>
-    );
-}
-
-// ─── Floating driver indicator badge ────────────────────────────────────────
-
-function DriverBadge() {
-    return (
-        <div className="absolute top-3 left-3 z-[1000] flex items-center gap-2 rounded-full bg-gray-900/80 backdrop-blur px-3 py-1.5 shadow-lg border border-gray-700/40">
-            <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500" />
-            </span>
-            <span className="text-xs font-medium text-gray-200">Driver Live</span>
-        </div>
-    );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════
-// TradeMap — main export
-// ═══════════════════════════════════════════════════════════════════════════
-
-export default function TradeMap({
-    role = "customer",
-    driverLocation = { lat: 28.6139, lng: 77.209 },
-    deliveryPoints = [],
-    routePolyline,
-    onReorderStops,
+export default function RouteMap({
+  driverLocation = { lat: 28.6139, lng: 77.209 },
+  deliveryPoints = [
+    { id: 1, lat: 28.621, lng: 77.212, address: "Connaught Place", priority: true },
+    { id: 2, lat: 28.632, lng: 77.225, address: "New Delhi Rly Stn", priority: false },
+    { id: 3, lat: 28.610, lng: 77.230, address: "India Gate", priority: false }
+  ],
 }) {
-    const isDriver = role === "driver";
+  const [isOptimized, setIsOptimized] = useState(false);
+  const [routePath, setRoutePath] = useState([]);
 
-    // Build polyline: if none supplied, derive from driver + delivery points
-    const computedPolyline = useMemo(() => {
-        if (routePolyline) return routePolyline;
-        if (!deliveryPoints.length) return [];
-        return [
-            [driverLocation.lat, driverLocation.lng],
-            ...deliveryPoints.map((p) => [p.lat, p.lng]),
-        ];
-    }, [routePolyline, deliveryPoints, driverLocation]);
+  // Initial RAW path
+  useEffect(() => {
+    const raw = [
+      [driverLocation.lat, driverLocation.lng],
+      ...deliveryPoints.map(p => [p.lat, p.lng])
+    ];
+    setRoutePath(raw);
+  }, [driverLocation, deliveryPoints]);
 
-    return (
-        <div className="relative w-full h-screen">
-            <MapContainer
-                center={[driverLocation.lat, driverLocation.lng]}
-                zoom={13}
-                scrollWheelZoom
-                className="h-full w-full"
-                style={{ height: "100%", width: "100%" }}
-            >
-                <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
+  const handleOptimize = () => {
+    setIsOptimized(true);
+    // Mock optimization: simply redraws path with new style, 
+    // real app would reorder 'deliveryPoints' and fetch Directions API geometry
+    const optimized = [
+        [driverLocation.lat, driverLocation.lng],
+        // Simulating a slightly different path geometry for visual flair
+        [driverLocation.lat + 0.005, driverLocation.lng + 0.002], 
+        ...deliveryPoints.map(p => [p.lat, p.lng])
+    ];
+    setRoutePath(optimized);
+  };
 
-                <MapController
-                    driverLocation={driverLocation}
-                    deliveryPoints={deliveryPoints}
-                />
+  return (
+    <div className="w-full h-screen relative bg-slate-100 overflow-hidden font-outfit">
+      <MapStyles /> {/* Inject CSS */}
 
-                {/* Driver marker — simulates movement only for the driver role */}
-                <DriverMarker location={driverLocation} simulate={isDriver} />
+      <MapContainer
+        center={[driverLocation.lat, driverLocation.lng]}
+        zoom={13}
+        className="w-full h-full z-0"
+        zoomControl={false} // We can add custom zoom controls if needed
+      >
+        <TileLayer
+          className="cinematic-tiles"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
 
-                {/* Delivery point markers */}
-                {deliveryPoints.length > 0 && (
-                    <DeliveryMarkers
-                        points={deliveryPoints}
-                        draggable={isDriver}
-                        onReorder={isDriver ? onReorderStops : undefined}
-                    />
-                )}
+        <MapController driverLocation={driverLocation} deliveryPoints={deliveryPoints} />
 
-                {/* Route polyline */}
-                <RoutePolylineLayer positions={computedPolyline} />
-            </MapContainer>
+        {/* Driver Pin */}
+        <Marker position={[driverLocation.lat, driverLocation.lng]} icon={createDriverIcon()} zIndexOffset={1000}>
+           <Popup className="font-outfit font-bold text-[#59112e]">You are here</Popup>
+        </Marker>
 
-            {/* Floating driver badge */}
-            <DriverBadge />
+        {/* Stops */}
+        {deliveryPoints.map((pt, idx) => (
+          <Marker 
+            key={pt.id} 
+            position={[pt.lat, pt.lng]} 
+            icon={createStopIcon(idx, pt.priority, isOptimized)}
+          >
+            <Popup className="font-outfit">
+               <div className="p-1">
+                 <p className="text-xs text-slate-400 font-bold uppercase mb-1">Stop {idx + 1}</p>
+                 <p className="font-bold text-slate-800 text-sm">{pt.address}</p>
+                 {pt.priority && <p className="text-[10px] text-rose-500 font-bold mt-1">★ Priority Delivery</p>}
+               </div>
+            </Popup>
+          </Marker>
+        ))}
 
-            {/* Bottom panel — driver only */}
-            {isDriver && (
-                <DriverPanel
-                    deliveryPoints={deliveryPoints}
-                    routePolyline={computedPolyline}
-                />
-            )}
-        </div>
-    );
+        {/* Route Line */}
+        <RouteLayer positions={routePath} isOptimized={isOptimized} />
+
+      </MapContainer>
+
+      {/* Top Left Badge */}
+      <div className="absolute top-4 left-4 z-[1000] bg-white/90 backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-white/50 flex items-center gap-2">
+         <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+         </span>
+         <span className="text-xs font-bold text-[#59112e]">Live Tracking</span>
+      </div>
+
+      <FloatingPanel 
+        deliveryPoints={deliveryPoints} 
+        isOptimized={isOptimized} 
+        onOptimize={handleOptimize} 
+      />
+    </div>
+  );
 }
