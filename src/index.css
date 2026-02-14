@@ -1,0 +1,6 @@
+@utility font-outfit{
+  font-family: 'Outfit', sans-serif;  
+}
+
+@import './theme/theme.css';
+@import 'tailwindcss'

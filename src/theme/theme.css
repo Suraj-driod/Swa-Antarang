@@ -1,0 +1,31 @@
+@theme {
+
+  /* ======================
+     BACKGROUNDS
+  ====================== */
+
+  --color-background: #ffffff;     /* main white background */
+  --color-surface: #ffffff;
+  --color-panel: #ffffff;
+
+  /* ======================
+     BRAND COLORS
+  ====================== */
+
+  --color-primary: #59112e;
+  --color-primary-soft: #fdf2f6;
+
+  /* ======================
+     TEXT COLORS
+  ====================== */
+
+  --color-text-main: #2d0b16;
+  --color-text-soft: #6b4c59;
+
+  /* ======================
+     BORDER
+  ====================== */
+
+  --color-border-soft: #f2d8e4;
+
+}
