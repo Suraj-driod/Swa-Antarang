@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -18,12 +18,120 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../app/providers/AuthContext';
 
-// 1. BACKGROUND PATTERN: "Delivery Man Only" (Kept as is)
-const deliveryMenPattern = `data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2359112e' fill-opacity='0.05'%3E%3Ccircle cx='75' cy='25' r='5'/%3E%3Cpath d='M72 32h6v12h-6z'/%3E%3Crect x='78' y='32' width='10' height='10' rx='1'/%3E%3Cpath d='M75 44v14h-4v-14h4zm6 0v14h4v-14h-4z'/%3E%3C/g%3E%3C/svg%3E`;
+// Custom delivery person SVG icon component
+const DeliveryPerson = ({ size = 24, style }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    {/* Head */}
+    <circle cx="12" cy="4" r="2.5" />
+    {/* Body */}
+    <path d="M12 6.5v5" />
+    {/* Arms carrying box */}
+    <path d="M8 8.5l4 1.5 4-1.5" />
+    {/* Box on back */}
+    <rect x="14" y="7" width="4" height="3.5" rx="0.5" />
+    {/* Legs walking */}
+    <path d="M12 11.5l-3 6.5" />
+    <path d="M12 11.5l3 6.5" />
+    {/* Feet */}
+    <path d="M9 18l-1.5 1" />
+    <path d="M15 18l1.5 1" />
+  </svg>
+);
 
-// 2. NEW HEADER PATTERN: "Map Pin and Stuff"
-// Replaced the truck pattern with Map Pins and small location dots.
-const cardMapPattern = `data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z' fill='%2359112e' fill-opacity='0.08'/%3E%3Ccircle cx='20' cy='20' r='1.5' fill='%2359112e' fill-opacity='0.08'/%3E%3C/svg%3E`;
+// Doodle icons for background grid
+const DOODLE_ICONS = [
+  Truck, ShoppingBag, Package, MapPin, Store, DeliveryPerson
+];
+
+// Seeded random for consistent layout across renders
+function seededRandom(seed) {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+// Grid size in pixels for each cell
+const CELL_SIZE = 110;
+
+// Generate grid-based doodle items — continuous pattern with per-cell randomness
+function generateGridDoodles(cols, rows) {
+  const rand = seededRandom(42);
+  const doodles = [];
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const jitterX = (rand() - 0.5) * 30;  // ±15px offset within cell
+      const jitterY = (rand() - 0.5) * 30;
+      doodles.push({
+        id: row * cols + col,
+        IconComponent: DOODLE_ICONS[Math.floor(rand() * DOODLE_ICONS.length)],
+        x: col * CELL_SIZE + CELL_SIZE / 2 + jitterX,
+        y: row * CELL_SIZE + CELL_SIZE / 2 + jitterY,
+        size: 24 + rand() * 16,              // 24–40px
+        rotation: -25 + rand() * 50,         // -25° to +25°
+        opacity: 0.12 + rand() * 0.10,       // 0.12–0.22
+        animDelay: rand() * 6,
+        animDuration: 5 + rand() * 4,        // 5–9s float cycle
+        floatY: 4 + rand() * 6,              // 4–10px gentle drift
+      });
+    }
+  }
+  return doodles;
+}
+
+// Floating doodle background component — grid-based continuous pattern
+const DoodleBackground = () => {
+  const [dims, setDims] = React.useState({ w: window.innerWidth, h: window.innerHeight });
+
+  React.useEffect(() => {
+    const onResize = () => setDims({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const cols = Math.ceil(dims.w / CELL_SIZE) + 1;
+  const rows = Math.ceil(dims.h / CELL_SIZE) + 1;
+  const doodles = useMemo(() => generateGridDoodles(cols, rows), [cols, rows]);
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+      {doodles.map((d) => {
+        const Icon = d.IconComponent;
+        return (
+          <motion.div
+            key={d.id}
+            className="absolute"
+            style={{
+              left: d.x,
+              top: d.y,
+              rotate: `${d.rotation}deg`,
+            }}
+            animate={{
+              y: [0, -d.floatY, 0],
+            }}
+            transition={{
+              duration: d.animDuration,
+              repeat: Infinity,
+              ease: 'easeInOut',
+              delay: d.animDelay,
+            }}
+          >
+            <Icon
+              size={d.size}
+              strokeWidth={1.2}
+              style={{
+                color: '#59112e',
+                opacity: d.opacity,
+              }}
+            />
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+};
 
 const AuthScreen = () => {
   const { login } = useAuth();
@@ -91,15 +199,16 @@ const AuthScreen = () => {
   const ActiveIcon = activeConfig.icon;
 
   return (
-    // Outer Background - Using the Delivery Men pattern
+    // Outer Background - Randomized doodle scatter
     <div
       className="min-h-screen w-full flex items-center justify-center p-4 font-outfit relative"
       style={{
         backgroundColor: 'var(--color-primary-soft)',
-        backgroundImage: `radial-gradient(circle at 50% 0%, #ffffffaa, transparent), url("${deliveryMenPattern}")`,
-        backgroundBlendMode: 'multiply'
+        backgroundImage: `radial-gradient(circle at 50% 0%, #ffffffaa, transparent)`,
       }}
     >
+      {/* Scattered doodle icons */}
+      <DoodleBackground />
 
       {/* Main Card - Solid White */}
       <motion.div
