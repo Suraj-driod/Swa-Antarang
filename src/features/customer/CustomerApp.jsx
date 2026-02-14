@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ShoppingBag,
@@ -309,11 +309,10 @@ const SidePanel = ({
               {ORDER_TIMELINE.map((step, idx) => (
                 <div key={idx} className="relative z-10 flex gap-4">
                   <div
-                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 bg-white ${
-                      step.completed || orderComplete
-                        ? "border-[#59112e]"
-                        : "border-slate-200"
-                    }`}
+                    className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 bg-white ${step.completed || orderComplete
+                      ? "border-[#59112e]"
+                      : "border-slate-200"
+                      }`}
                   >
                     <div
                       className={`w-1.5 h-1.5 rounded-full ${step.completed || orderComplete ? "bg-[#59112e]" : "bg-transparent"}`}
@@ -404,63 +403,16 @@ const CustomerApp = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] font-outfit flex flex-col md:flex-row">
-      {/* --- DESKTOP SIDEBAR (Navigation) --- */}
-      <aside className="hidden md:flex w-64 bg-white border-r border-slate-100 flex-col p-6 sticky top-0 h-screen">
-        <div className="flex items-center gap-2 mb-10">
-          <div className="w-8 h-8 bg-[#59112e] rounded-lg flex items-center justify-center text-white font-bold">
-            SM
-          </div>
-          <span className="font-bold text-slate-800 text-lg">
-            SupplierMatch
-          </span>
-        </div>
-
-        <nav className="space-y-2 flex-1">
-          <button
-            onClick={() => handleTabChange("home")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-colors ${activeTab === "home" ? "bg-[#fdf2f6] text-[#59112e]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
-          >
-            <Home size={18} /> Browse Products
-          </button>
-          <button
-            onClick={() => handleTabChange("cart")} // Only relevant for highlighting, content is in right panel
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-colors ${desktopView === "cart" && activeTab !== "home" ? "bg-[#fdf2f6] text-[#59112e]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
-          >
-            <ShoppingBag size={18} /> My Cart
-            {cart.length > 0 && (
-              <span className="ml-auto bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-md">
-                {cart.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => handleTabChange("tracking")}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-sm transition-colors ${desktopView === "tracking" ? "bg-[#fdf2f6] text-[#59112e]" : "text-slate-400 hover:text-slate-600 hover:bg-slate-50"}`}
-          >
-            <Clock size={18} /> Orders & Tracking
-          </button>
-        </nav>
-
-        <div className="bg-slate-50 p-4 rounded-xl flex items-center gap-3 border border-slate-100">
-          <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600">
-            <User size={20} />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-800">Acme Corp</p>
-            <p className="text-[10px] text-slate-400">Pro Member</p>
-          </div>
-        </div>
-      </aside>
+    <div className="min-h-screen bg-[#f8f9fa] font-outfit flex flex-col">
 
       {/* --- MAIN CONTENT AREA --- */}
       <main className="flex-1 flex flex-col md:flex-row relative">
         {/* PRODUCT GRID (Scrollable Center) */}
         <div
-          className={`flex-1 p-6 md:p-10 overflow-y-auto h-screen ${activeTab !== "home" ? "hidden md:block" : "block"}`}
+          className={`flex-1 p-6 md:p-10 ${activeTab !== "home" ? "hidden md:block" : "block"}`}
         >
           {/* Mobile Header */}
-          <div className="md:hidden flex justify-between items-center mb-6 sticky top-0 bg-[#f8f9fa] z-20 py-2">
+          <div className="md:hidden flex justify-between items-center mb-6 bg-[#f8f9fa] py-2">
             <div>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                 Location
@@ -474,26 +426,10 @@ const CustomerApp = () => {
             </div>
           </div>
 
-          {/* Banner */}
-          <div className="h-40 md:h-48 bg-gradient-to-r from-[#59112e] to-[#9d174d] rounded-[32px] mb-10 relative overflow-hidden flex items-center px-8 md:px-12 shadow-2xl shadow-[#59112e]/20">
-            <div className="relative z-10 text-white">
-              <span className="bg-white/20 backdrop-blur-md text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide mb-3 inline-block">
-                Flash Sale
-              </span>
-              <h2 className="font-bold text-2xl md:text-3xl mb-1">
-                Restock Your Inventory
-              </h2>
-              <p className="text-sm text-white/80 mb-4 max-w-xs">
-                Get up to 20% off on bulk Hardware orders today.
-              </p>
-            </div>
-            <div className="absolute right-0 bottom-0 text-[10rem] opacity-10 rotate-12">
-              📦
-            </div>
-          </div>
+
 
           {/* Search & Filter */}
-          <div className="flex gap-4 mb-8 sticky top-14 md:top-0 z-10 bg-[#f8f9fa] pb-2">
+          <div className="flex gap-4 mb-8 bg-[#f8f9fa] pb-2">
             <div className="relative flex-1">
               <Search
                 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
@@ -524,7 +460,7 @@ const CustomerApp = () => {
         {/* RIGHT PANEL (Desktop: Fixed / Mobile: Full Screen Overlay for Cart/Tracking) */}
         <div
           className={`
-              md:w-[400px] bg-white border-l border-slate-100 h-screen sticky top-0 z-30
+              md:w-[400px] bg-white border-l border-slate-100 md:sticky md:top-20 md:h-[calc(100vh-5rem)] z-30
               ${activeTab === "home" ? "hidden md:block" : "fixed inset-0 md:static block"}
           `}
         >
