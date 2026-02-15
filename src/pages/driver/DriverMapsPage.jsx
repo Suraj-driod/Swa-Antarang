@@ -127,23 +127,33 @@ export default function DriverMapsPage() {
 
     useEffect(() => {
         if (!user?.driverProfileId) {
+            console.log('No driver profile ID');
             setLoading(false);
             return;
         }
+        console.log('Fetching route for driver:', user.driverProfileId);
         getAssignedRoute(user.driverProfileId)
             .then(data => {
+                console.log('Route data received:', data);
                 if (data.routePlan) {
+                    console.log('Setting route plan:', data.routePlan);
                     setRoutePlan(data.routePlan);
                     // Center on first stop
                     if (data.routePlan.stops?.length > 0) {
+                        console.log('Setting driver location to:', data.routePlan.stops[0]);
                         setDriverLocation({
                             lat: data.routePlan.stops[0].lat,
                             lng: data.routePlan.stops[0].lng,
                         });
                     }
+                } else {
+                    console.log('No route plan in data');
                 }
             })
-            .catch(err => console.error('Failed to fetch assigned route:', err))
+            .catch(err => {
+                console.error('Failed to fetch assigned route:', err);
+                console.error('Error details:', err.message);
+            })
             .finally(() => setLoading(false));
     }, [user?.driverProfileId]);
 

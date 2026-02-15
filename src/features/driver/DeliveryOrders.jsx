@@ -553,9 +553,9 @@ const DeliveryOrders = () => {
                     {/* Tags & Price */}
                     <div className="flex justify-between items-start mb-4">
                       <div className="flex gap-2 flex-wrap">
-                        {req.tags.map((tag) => (
+                        {req.tags?.filter(tag => tag && tag.trim()).map((tag, idx) => (
                           <span
-                            key={tag}
+                            key={`${req.id}-tag-${idx}`}
                             className="px-2.5 py-1 rounded-lg bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border border-slate-100"
                           >
                             {tag}

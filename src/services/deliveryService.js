@@ -5,22 +5,41 @@ import { supabase } from './supabaseClient';
 export async function getAssignedDeliveries(driverProfileId) {
     const { data, error } = await supabase
         .from('deliveries')
-        .select('*, orders(*, order_items(*), merchant_profiles!merchant_id(business_name, address, lat, lng))')
+        .select(`
+            id, status, pickup_at, updated_at, gps_log, driver_id, order_id,
+            orders!order_id (
+                id, type, status, total_amount, shipping_address,
+                merchant_profiles!merchant_id (id, business_name, address, lat, lng),
+                order_items!order_id (id, product_name, quantity, unit_price)
+            )
+        `)
         .eq('driver_id', driverProfileId)
         .neq('status', 'delivered')
         .order('created_at', { ascending: false });
-    if (error) throw error;
+    if (error) {
+        console.error('Error fetching assigned deliveries:', error);
+        throw error;
+    }
     return data;
 }
 
 export async function getDeliveryHistory(driverProfileId) {
     const { data, error } = await supabase
         .from('deliveries')
-        .select('*, orders(*, order_items(*), merchant_profiles!merchant_id(business_name))')
+        .select(`
+            id, status, delivered_at, updated_at, gps_log, driver_id, order_id,
+            orders!order_id (
+                id, type, status, total_amount,
+                merchant_profiles!merchant_id (id, business_name)
+            )
+        `)
         .eq('driver_id', driverProfileId)
         .eq('status', 'delivered')
         .order('delivered_at', { ascending: false });
-    if (error) throw error;
+    if (error) {
+        console.error('Error fetching delivery history:', error);
+        throw error;
+    }
     return data;
 }
 
