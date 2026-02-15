@@ -177,10 +177,11 @@ const RequestsPanel = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] font-outfit text-[#2d0b16] flex flex-col md:flex-row overflow-hidden">
+    // FIX: Added 'pt-20' (padding-top) to push content below the fixed Navbar
+    <div className="h-screen bg-[#f8f9fa] font-outfit text-[#2d0b16] flex flex-col md:flex-row overflow-hidden pt-20">
       
       {/* === LEFT: MAIN REQUESTS LIST (65%) === */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#fafafa]">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#fafafa]">
         
         {/* Header */}
         <div className="h-24 px-8 border-b border-[#f2d8e4] bg-white flex items-center justify-between shrink-0 shadow-sm z-10">
@@ -200,7 +201,7 @@ const RequestsPanel = () => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="px-8 pt-6 pb-2">
+        <div className="px-8 pt-6 pb-2 shrink-0">
             <div className="bg-[#fdf2f6] p-1.5 rounded-xl inline-flex border border-[#f2d8e4]">
                 <button 
                     onClick={() => setActiveTab('b2b')}
@@ -297,10 +298,10 @@ const RequestsPanel = () => {
       </div>
 
       {/* === RIGHT: AI ASSISTANT SIDEBAR (35%) === */}
-      <div className="w-full md:w-[400px] bg-white border-l border-[#f2d8e4] flex flex-col z-20 shadow-[-10px_0_40px_rgba(0,0,0,0.02)]">
+      <div className="w-full md:w-[400px] bg-white border-l border-[#f2d8e4] flex flex-col z-20 shadow-[-10px_0_40px_rgba(0,0,0,0.02)] h-full">
           
           {/* AI Header */}
-          <div className="p-6 border-b border-[#f2d8e4] bg-white relative overflow-hidden">
+          <div className="p-6 border-b border-[#f2d8e4] bg-white relative overflow-hidden shrink-0">
               <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#fdf2f6] to-transparent rounded-bl-full pointer-events-none"></div>
               <div className="flex items-center gap-3 relative z-10">
                   <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#59112e] to-[#851e45] flex items-center justify-center text-white shadow-lg shadow-[#59112e]/20">
@@ -341,7 +342,7 @@ const RequestsPanel = () => {
           </div>
 
           {/* Input Area */}
-          <div className="p-4 bg-white border-t border-[#f2d8e4]">
+          <div className="p-4 bg-white border-t border-[#f2d8e4] shrink-0">
               <div className="relative">
                   <input 
                       type="text" 

@@ -222,13 +222,14 @@ const TrackingPanel = () => {
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] font-outfit text-[#2d0b16] flex flex-col md:flex-row overflow-hidden">
+    // FIX: Added 'pt-20' to push content below the fixed Navbar
+    <div className="h-screen bg-[#f8f9fa] font-outfit text-[#2d0b16] flex flex-col md:flex-row overflow-hidden pt-20">
       
       {/* === LEFT SIDEBAR: ORDER LIST === */}
-      <div className="w-full md:w-[400px] bg-white border-r border-[#f2d8e4] flex flex-col z-20 shadow-lg">
+      <div className="w-full md:w-[400px] bg-white border-r border-[#f2d8e4] flex flex-col z-20 shadow-lg h-full">
          
          {/* Header */}
-         <div className="p-6 border-b border-[#f2d8e4]">
+         <div className="p-6 border-b border-[#f2d8e4] shrink-0">
             <h1 className="text-2xl font-bold text-[#59112e] mb-6">Track Shipments</h1>
             
             {/* Tab Switcher */}
@@ -301,7 +302,7 @@ const TrackingPanel = () => {
       </div>
 
       {/* === RIGHT: MAP & DETAILS AREA === */}
-      <div className="flex-1 relative bg-[#eef0f3] overflow-hidden flex flex-col">
+      <div className="flex-1 relative bg-[#eef0f3] overflow-hidden flex flex-col h-full">
          
          {/* Live Map Area */}
          <div className="flex-1 relative">

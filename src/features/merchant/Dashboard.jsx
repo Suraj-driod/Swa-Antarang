@@ -141,7 +141,8 @@ const SalesChart = () => (
 
 const Dashboard = () => {
   return (
-    <div className="min-h-screen bg-[#f8f9fa] font-outfit p-6 md:p-10 pb-20">
+    // FIX: Added 'pt-20 md:pt-28' to account for fixed navbar height
+    <div className="min-h-screen bg-[#f8f9fa] font-outfit p-6 md:p-10 pb-20 pt-20 md:pt-28">
 
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
