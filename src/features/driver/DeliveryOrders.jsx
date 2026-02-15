@@ -7,16 +7,14 @@ import {
   Navigation,
   MessageSquare,
   Phone,
-  CheckCircle2,
   Send,
   SlidersHorizontal,
-  ArrowRight,
 } from "lucide-react";
 
 import ChatWidget from "./components/ChatWidget";
 import { useAuth } from '../../app/providers/AuthContext';
-import { getAssignedDeliveries, markPickedUp, markInTransit } from '../../services/deliveryService';
-import { getOpenOndcRequests, acceptOndcRequest } from '../../services/logisticsService';
+import { getAssignedDeliveries } from '../../services/deliveryService';
+import { getOpenOndcRequests } from '../../services/logisticsService';
 
 // --- Negotiation Panel ---
 const NegotiationPanel = ({ basePrice, onCancel, onSubmit }) => {
@@ -98,6 +96,8 @@ const DeliveryOrders = () => {
   // Fetch assigned deliveries + ONDC open requests
   useEffect(() => {
     if (!user?.driverProfileId) return;
+    
+    // Fetch Active Deliveries
     getAssignedDeliveries(user.driverProfileId).then(data => {
       setActiveOrders(data.map(d => ({
         id: d.id,
@@ -114,6 +114,7 @@ const DeliveryOrders = () => {
       })));
     }).catch(console.error);
 
+    // Fetch Open Requests
     getOpenOndcRequests().then(data => {
       setRequests(data.map(r => ({
         id: r.id,
@@ -160,7 +161,8 @@ const DeliveryOrders = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] font-outfit">
+    // FIX: Added pt-24 to clear fixed navbar
+    <div className="min-h-screen bg-[#f8f9fa] font-outfit pt-24">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 py-6 lg:py-8">
 
         {/* --- HEADER --- */}
@@ -202,7 +204,8 @@ const DeliveryOrders = () => {
               className={`flex-1 py-3 text-sm font-bold relative z-10 transition-colors ${activeTab === "requests" ? "text-[#59112e]" : "text-slate-400"
                 }`}
             >
-              New Requests ({REQUESTS.length})
+              {/* FIX: Use 'requests.length' state, not undefined 'REQUESTS' */}
+              New Requests ({requests.length})
             </button>
           </div>
 
@@ -338,7 +341,7 @@ const DeliveryOrders = () => {
                     <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between text-sm font-bold text-slate-500">
                       <span>{req.distance} km</span>
                       <span className="text-[#59112e]">
-                        ₹{Math.round(req.offer / req.distance)}/km
+                        ₹{req.distance > 0 ? Math.round(req.offer / req.distance) : 0}/km
                       </span>
                     </div>
                   </div>
