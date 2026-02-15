@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import {
   User,
   LogOut,
@@ -17,7 +17,9 @@ const Navbar = ({ items = [], brandTitle = 'Swa-Antarang', brandSub = 'Platform'
   const navigate = useNavigate();
   const location = useLocation();
 
-  const currentFullPath = location.pathname + location.search;
+  // FIX: Use only pathname. Ignoring location.search ensures the active tab 
+  // stays stable even if the page adds query parameters (e.g. ?id=101)
+  const currentPath = location.pathname;
 
   const handleLogout = () => {
     logout();
@@ -46,48 +48,54 @@ const Navbar = ({ items = [], brandTitle = 'Swa-Antarang', brandSub = 'Platform'
 
         {/* --- CENTER: NAVIGATION CAPSULE (Desktop) --- */}
         <nav className="pointer-events-auto hidden md:block">
-          <div className="flex items-center gap-1 p-1.5 bg-white/70 backdrop-blur-2xl border border-[#f2d8e4] rounded-full shadow-[0_8px_32px_-8px_rgba(89,17,46,0.1)] ring-1 ring-white/60">
-            {items.map((item) => {
-              const isActive = currentFullPath === item.to;
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  onMouseEnter={() => setHoveredTab(item.to)}
-                  onMouseLeave={() => setHoveredTab(null)}
-                  className="relative px-5 py-2.5 rounded-full text-xs font-bold flex items-center gap-2 transition-all duration-300"
-                >
-                  {isActive && (
-                    <motion.div
-                      layoutId="navPill"
-                      className="absolute inset-0 bg-[#59112e] rounded-full shadow-lg shadow-[#59112e]/20"
-                      transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                    />
-                  )}
+          {/* LayoutGroup ensures shared transitions work across the specific group ID */}
+          <LayoutGroup id="navbar-pill-group">
+            <div className="flex items-center gap-1 p-1.5 bg-white/70 backdrop-blur-2xl border border-[#f2d8e4] rounded-full shadow-[0_8px_32px_-8px_rgba(89,17,46,0.1)] ring-1 ring-white/60">
+              {items.map((item) => {
+                // FIX: Check against currentPath (pathname only)
+                const isActive = currentPath === item.to;
 
-                  <AnimatePresence>
-                    {hoveredTab === item.to && !isActive && (
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    onMouseEnter={() => setHoveredTab(item.to)}
+                    onMouseLeave={() => setHoveredTab(null)}
+                    className="relative px-5 py-2.5 rounded-full text-xs font-bold flex items-center gap-2 transition-all duration-300"
+                  >
+                    {isActive && (
                       <motion.div
-                        layoutId="hoverPill"
-                        className="absolute inset-0 bg-[#fdf2f6] border border-[#fbcfe8] rounded-full -z-10"
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{ duration: 0.2 }}
+                        layout // FIX: 'layout' prop is essential for smooth position changes
+                        layoutId="navPill"
+                        className="absolute inset-0 bg-[#59112e] rounded-full shadow-lg shadow-[#59112e]/20"
+                        transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
                       />
                     )}
-                  </AnimatePresence>
 
-                  <item.icon size={16} strokeWidth={isActive ? 2.5 : 2} className={`relative z-10 ${isActive ? 'text-white' : 'text-[#6b4c59] hover:text-[#59112e]'}`} />
-                  <span className={`relative z-10 ${isActive ? 'text-white' : 'text-[#6b4c59] hover:text-[#59112e]'}`}>{item.label}</span>
+                    <AnimatePresence>
+                      {hoveredTab === item.to && !isActive && (
+                        <motion.div
+                          layoutId="hoverPill"
+                          className="absolute inset-0 bg-[#fdf2f6] border border-[#fbcfe8] rounded-full -z-10"
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          transition={{ duration: 0.2 }}
+                        />
+                      )}
+                    </AnimatePresence>
 
-                  {item.badge && !isActive && (
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border border-white relative z-10"></span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
+                    <item.icon size={16} strokeWidth={isActive ? 2.5 : 2} className={`relative z-10 ${isActive ? 'text-white' : 'text-[#6b4c59] hover:text-[#59112e]'}`} />
+                    <span className={`relative z-10 ${isActive ? 'text-white' : 'text-[#6b4c59] hover:text-[#59112e]'}`}>{item.label}</span>
+
+                    {item.badge && !isActive && (
+                      <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full border border-white relative z-10"></span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </LayoutGroup>
         </nav>
 
         {/* --- RIGHT: ACTION CLUSTER --- */}
@@ -151,15 +159,15 @@ const Navbar = ({ items = [], brandTitle = 'Swa-Antarang', brandSub = 'Platform'
             >
               <nav className="p-3 space-y-1">
                 {items.map((item) => {
-                  const isActive = currentFullPath === item.to;
+                  const isActive = currentPath === item.to;
                   return (
                     <Link
                       key={item.to}
                       to={item.to}
                       onClick={() => setMobileMenuOpen(false)}
                       className={`flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all ${isActive
-                          ? 'bg-[#59112e] text-white shadow-md shadow-[#59112e]/20'
-                          : 'text-slate-600 hover:bg-[#fdf2f6] hover:text-[#59112e]'
+                        ? 'bg-[#59112e] text-white shadow-md shadow-[#59112e]/20'
+                        : 'text-slate-600 hover:bg-[#fdf2f6] hover:text-[#59112e]'
                         }`}
                     >
                       <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
