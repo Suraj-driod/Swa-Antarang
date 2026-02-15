@@ -1,6 +1,88 @@
-@utility font-outfit{
-  font-family: 'Outfit', sans-serif;  
+@utility font-outfit {
+  font-family: 'Outfit', sans-serif;
+}
+
+@utility font-display {
+  font-family: 'Lora', Georgia, serif;
 }
 
 @import './theme/theme.css';
-@import 'tailwindcss'
+@import 'tailwindcss';
+
+/* ===========================
+   HERO GRID BACKGROUND
+=========================== */
+
+@utility hero-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+@utility hero-glow {
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 40%,
+    rgba(201, 52, 91, 0.08) 0%,
+    transparent 70%
+  );
+}
+
+@utility hero-glow-strong {
+  background: radial-gradient(
+    ellipse 50% 40% at 50% 50%,
+    rgba(201, 52, 91, 0.15) 0%,
+    rgba(89, 17, 46, 0.05) 40%,
+    transparent 70%
+  );
+}
+
+/* ===========================
+   SECTION GRID (LIGHT)
+=========================== */
+
+@utility light-grid {
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ===========================
+   GRADIENT TEXT
+=========================== */
+
+@utility text-gradient {
+  background: linear-gradient(135deg, #c9345b 0%, #59112e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ===========================
+   GLOW BLOBS
+=========================== */
+
+@utility glow-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(120px);
+  pointer-events: none;
+}
+
+/* ===========================
+   SMOOTH SCROLL
+=========================== */
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* ===========================
+   SELECTION
+=========================== */
+
+::selection {
+  background: rgba(201, 52, 91, 0.2);
+  color: inherit;
+}

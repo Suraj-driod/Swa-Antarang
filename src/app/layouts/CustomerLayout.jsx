@@ -1,16 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import Navbar from '../../components/ui/Navbar';
-import {
-    Home,
-    ShoppingBag,
-    Clock,
-} from 'lucide-react';
-
-const customerNavItems = [
-    { to: '/customer/CustomerApp', icon: Home, label: 'Browse Products' },
-    { to: '/customer/CustomerApp?view=cart', icon: ShoppingBag, label: 'My Cart' },
-    { to: '/customer/CustomerApp?view=tracking', icon: Clock, label: 'Orders & Tracking' },
-];
+import { customerNavItems } from '../../config/navItems';
 
 export default function CustomerLayout() {
     return (

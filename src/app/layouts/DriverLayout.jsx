@@ -1,18 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import Navbar from '../../components/ui/Navbar';
-import {
-    LayoutDashboard,
-    ClipboardList,
-    Clock,
-    Map,
-} from 'lucide-react';
-
-const driverNavItems = [
-    { to: '/driver/DashboardDelivery', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/driver/DashboardOrders', icon: ClipboardList, label: 'Orders' },
-    { to: '/driver/DashboardHistory', icon: Clock, label: 'History' },
-    { to: '/driver/maps', icon: Map, label: 'Maps' },
-];
+import { driverNavItems } from '../../config/navItems';
 
 export default function DriverLayout() {
     return (

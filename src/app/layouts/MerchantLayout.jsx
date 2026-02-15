@@ -1,20 +1,6 @@
 import { Outlet } from 'react-router-dom';
 import Navbar from '../../components/ui/Navbar';
-import {
-    LayoutDashboard,
-    Package,
-    Radio,
-    MessageSquare,
-    MapPin,
-} from 'lucide-react';
-
-const merchantNavItems = [
-    { to: '/merchant/Dashboard', icon: LayoutDashboard, label: 'Home' },
-    { to: '/merchant/Inventory', icon: Package, label: 'Inventory' },
-    { to: '/merchant/Propogation', icon: Radio, label: 'Propagate' },
-    { to: '/merchant/Requests', icon: MessageSquare, label: 'Requests', badge: true },
-    { to: '/merchant/Track', icon: MapPin, label: 'Track' },
-];
+import { merchantNavItems } from '../../config/navItems';
 
 export default function MerchantLayout() {
     return (

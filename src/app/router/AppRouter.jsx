@@ -9,6 +9,7 @@ import ProtectedRoute from './ProtectedRoute';
 import RoleRoute from './RoleRoute';
 
 // --- Layouts ---
+import PublicLayout from '../layouts/PublicLayout';
 import MerchantLayout from '../layouts/MerchantLayout';
 import DriverLayout from '../layouts/DriverLayout';
 import CustomerLayout from '../layouts/CustomerLayout';
@@ -16,6 +17,7 @@ import CustomerLayout from '../layouts/CustomerLayout';
 // --- Public Pages ---
 import Login from '../../components/ui/Login';
 import TradeMap from '../../components/map/TradeMap';
+import LandingPage from '../../pages/landing/LandingPage';
 
 // --- Merchant Pages ---
 import Dashboard from '../../features/merchant/Dashboard';
@@ -40,6 +42,9 @@ export default function AppRouter() {
                 <RoleProvider>
                     <Routes>
                         {/* ─── Public Routes ─── */}
+                        <Route element={<PublicLayout />}>
+                            <Route path="/" element={<LandingPage />} />
+                        </Route>
                         <Route path="/ui/Login" element={<Login />} />
                         <Route path="/map/TradeMap" element={<TradeMap />} />
 
@@ -79,8 +84,8 @@ export default function AppRouter() {
 
                         </Route>
 
-                        {/* ─── Catch-all → Login ─── */}
-                        <Route path="*" element={<Navigate to="/ui/Login" replace />} />
+                        {/* ─── Catch-all → Landing ─── */}
+                        <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
                 </RoleProvider>
             </AuthProvider>
