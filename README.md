@@ -128,5 +128,5 @@ We welcome contributions to make Swa-Antarang better! Please feel free to submit
 
 <div align="center">
   <p>Built with ❤️ for Local Commerce</p>
-  <p>&copy; 2024 Swa-Antarang</p>
-</div>
+  <p>&copy; 2026 Swa-Antarang</p>
+</div> 
