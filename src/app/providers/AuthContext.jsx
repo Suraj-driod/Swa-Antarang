@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '../../services/supabaseClient';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import { supabase, nukeAuthStorage } from '../../services/supabaseClient';
 
 const AuthContext = createContext(null);
 
@@ -9,7 +9,7 @@ export const useAuth = () => {
     return ctx;
 };
 
-// Load profile + merchant/driver profile id for the authenticated user
+// Fetch profile + role-specific sub-profile id
 async function loadProfile(userId) {
     const { data: profile, error } = await supabase
         .from('profiles')
@@ -53,89 +53,159 @@ async function loadProfile(userId) {
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const mountedRef = useRef(true);
 
+    // Local-only signout — no network call, just clear storage + state
+    const cleanSession = useCallback(async () => {
+        try { await supabase.auth.signOut({ scope: 'local' }); } catch { /* swallow */ }
+        nukeAuthStorage();
+        if (mountedRef.current) setUser(null);
+    }, []);
+
+    // ── Bootstrap: restore + validate session on mount ──
     useEffect(() => {
-        let cancelled = false;
+        mountedRef.current = true;
 
-        // 1. Explicit initial session check — getSession() is synchronous with localStorage,
-        //    so it won't miss the window like onAuthStateChange INITIAL_SESSION can.
-        const initSession = async () => {
+        const bootstrap = async () => {
             try {
+                // 1. Read session from localStorage (no network call in v2)
                 const { data: { session } } = await supabase.auth.getSession();
-                if (cancelled) return;
 
-                if (session?.user) {
-                    const profile = await loadProfile(session.user.id);
-                    if (!cancelled) setUser(profile);
+                if (!session) {
+                    // Nothing stored — fresh visitor
+                    return;
+                }
+
+                // 2. Validate with the server — this refreshes expired tokens automatically
+                const { data: { user: authUser }, error: userError } =
+                    await supabase.auth.getUser();
+
+                if (!mountedRef.current) return;
+
+                if (userError || !authUser) {
+                    // Token is truly dead — nuke everything
+                    await cleanSession();
+                    return;
+                }
+
+                // 3. Token valid — hydrate profile
+                const profile = await loadProfile(authUser.id);
+                if (!mountedRef.current) return;
+
+                if (profile) {
+                    setUser(profile);
+                } else {
+                    await cleanSession();
                 }
             } catch (err) {
-                console.error('Initial session check failed:', err);
+                console.warn('Auth bootstrap failed:', err.message);
+                if (mountedRef.current) {
+                    nukeAuthStorage();
+                    setUser(null);
+                }
             } finally {
-                if (!cancelled) setLoading(false);
+                if (mountedRef.current) setLoading(false);
             }
         };
 
-        initSession();
+        // Safety: if bootstrap hangs >10s, force loading off so the user isn't stuck
+        const safetyTimer = setTimeout(() => {
+            if (mountedRef.current) setLoading(false);
+        }, 10000);
 
-        // 2. Listen for subsequent auth changes (login, logout, token refresh).
-        //    Skip INITIAL_SESSION since getSession() above handles it.
+        bootstrap().finally(() => clearTimeout(safetyTimer));
+
+        // Listen for auth events AFTER bootstrap
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
             async (event, session) => {
-                if (cancelled || event === 'INITIAL_SESSION') return;
+                if (!mountedRef.current) return;
+                if (event === 'INITIAL_SESSION') return;
 
-                if (session?.user) {
+                if (event === 'SIGNED_OUT') {
+                    setUser(null);
+                    return;
+                }
+
+                if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
                     try {
                         const profile = await loadProfile(session.user.id);
-                        if (!cancelled) setUser(profile);
-                    } catch (err) {
-                        console.error('Profile load on auth change failed:', err);
-                        if (!cancelled) setUser(null);
+                        if (mountedRef.current) {
+                            if (profile) setUser(profile);
+                            else await cleanSession();
+                        }
+                    } catch {
+                        if (mountedRef.current) await cleanSession();
                     }
-                } else {
-                    if (!cancelled) setUser(null);
                 }
             }
         );
 
         return () => {
-            cancelled = true;
+            mountedRef.current = false;
             subscription.unsubscribe();
         };
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const login = async (email, password) => {
-        // Clear any stale session before attempting fresh login
-        const { data: { session: existingSession } } = await supabase.auth.getSession();
-        if (existingSession) {
-            await supabase.auth.signOut();
-        }
+    // ── Login: clear stale session first, then sign in ──
+    const login = useCallback(async (email, password) => {
+        // Kill any stale/expired session locally to prevent conflicts
+        try {
+            const { data: { session: existing } } = await supabase.auth.getSession();
+            if (existing) {
+                await supabase.auth.signOut({ scope: 'local' });
+                nukeAuthStorage();
+            }
+        } catch { /* safe to ignore */ }
 
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-
-        // Load profile directly — don't rely on onAuthStateChange race
-        if (data.session?.user) {
-            const profile = await loadProfile(data.session.user.id);
-            setUser(profile);
+        if (error) {
+            nukeAuthStorage();
+            throw error;
         }
 
-        return data;
-    };
+        const profile = await loadProfile(data.session.user.id);
+        if (!profile) {
+            await cleanSession();
+            throw new Error('Profile not found. Please sign up first.');
+        }
 
-    const signUp = async (email, password, metadata = {}) => {
+        setUser(profile);
+        return { ...data, profile };
+    }, [cleanSession]);
+
+    // ── Sign Up ──
+    const signUp = useCallback(async (email, password, metadata = {}) => {
+        // Clear any stale session first
+        try {
+            const { data: { session: existing } } = await supabase.auth.getSession();
+            if (existing) {
+                await supabase.auth.signOut({ scope: 'local' });
+                nukeAuthStorage();
+            }
+        } catch { /* safe to ignore */ }
+
         const { data, error } = await supabase.auth.signUp({
             email,
             password,
             options: { data: metadata },
         });
         if (error) throw error;
-        return data;
-    };
 
-    const logout = async () => {
-        await supabase.auth.signOut();
+        if (data.session?.user) {
+            await new Promise(r => setTimeout(r, 800));
+            const profile = await loadProfile(data.session.user.id);
+            if (profile) setUser(profile);
+        }
+
+        return data;
+    }, []);
+
+    // ── Logout ──
+    const logout = useCallback(async () => {
         setUser(null);
-    };
+        try { await supabase.auth.signOut(); } catch { /* swallow */ }
+        nukeAuthStorage();
+    }, []);
 
     return (
         <AuthContext.Provider value={{ user, loading, login, signUp, logout }}>

@@ -107,8 +107,8 @@ export default function ProfilePage() {
         else navigate(-1);
     };
 
-    const handleLogout = () => {
-        logout();
+    const handleLogout = async () => {
+        await logout();
         navigate('/ui/Login', { replace: true });
     };
 

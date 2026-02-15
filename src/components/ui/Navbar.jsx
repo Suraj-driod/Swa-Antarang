@@ -22,8 +22,8 @@ const Navbar = ({ items = [], brandTitle = 'Swa-Antarang', brandSub = 'Platform'
   // stays stable even if the page adds query parameters (e.g. ?id=101)
   const currentPath = location.pathname;
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/ui/Login', { replace: true });
   };
 
