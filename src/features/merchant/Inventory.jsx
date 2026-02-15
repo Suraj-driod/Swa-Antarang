@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Package,
@@ -13,13 +13,19 @@ import {
   Paperclip,
   ArrowUpRight,
   User,
-  RotateCw
+  RotateCw,
+  Camera,
+  Sparkles,
+  X,
+  Check,
+  Loader2,
+  ImagePlus
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../../app/providers/AuthContext';
-import { getRawInventory, getListedInventory, updateRawStock, bulkInsertRawItems, bulkInsertListedItems } from '../../services/inventoryService';
-import { getProductImageUrl } from '../../services/storageService';
-import { processExcelInventory } from '../../services/aiService';
+import { getRawInventory, getListedInventory, updateRawStock, bulkInsertRawItems, bulkInsertListedItems, updateListedItemImage } from '../../services/inventoryService';
+import { getProductImageUrl, uploadProductImage } from '../../services/storageService';
+import { processExcelInventory, enhanceProductImage } from '../../services/aiService';
 
 // Status map from DB enum to display
 const STATUS_MAP = {
@@ -84,6 +90,89 @@ const InventoryDashboard = () => {
   const [excelProcessing, setExcelProcessing] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+
+  // Image upload & enhancement state
+  const [uploadingImageFor, setUploadingImageFor] = useState(null); // item id
+  const [enhanceModal, setEnhanceModal] = useState(null); // { item, originalUrl, enhancedBase64, enhancedMimeType, loading, error }
+
+  const triggerImageUpload = useCallback((item) => {
+    setUploadingImageFor(item.id);
+    imageInputRef.current?.click();
+  }, []);
+
+  const handleProductImageUpload = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file || !uploadingImageFor) return;
+    const itemId = uploadingImageFor;
+    const ext = file.name.split('.').pop();
+    const fileName = `${user.merchantProfileId}/${itemId}-${Date.now()}.${ext}`;
+
+    try {
+      setUploadingImageFor('loading_' + itemId);
+      const { url, error } = await uploadProductImage(file, fileName);
+      if (error) throw error;
+      // Update DB
+      await updateListedItemImage(itemId, fileName);
+      // Update local state
+      setListedItems(prev => prev.map(it =>
+        it.id === itemId ? { ...it, imageUrl: url, image_url: fileName } : it
+      ));
+    } catch (err) {
+      console.error('Image upload failed:', err);
+    } finally {
+      setUploadingImageFor(null);
+      e.target.value = '';
+    }
+  };
+
+  const handleEnhanceImage = async (item) => {
+    if (!item.imageUrl) return;
+    setEnhanceModal({ item, originalUrl: item.imageUrl, enhancedBase64: null, enhancedMimeType: null, loading: true, error: null });
+
+    try {
+      // Fetch image and convert to base64
+      const res = await fetch(item.imageUrl);
+      const blob = await res.blob();
+      const base64 = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.readAsDataURL(blob);
+      });
+
+      const result = await enhanceProductImage(base64, blob.type || 'image/jpeg');
+      setEnhanceModal(prev => ({ ...prev, enhancedBase64: result.base64, enhancedMimeType: result.mimeType, loading: false }));
+    } catch (err) {
+      console.error('Enhancement failed:', err);
+      setEnhanceModal(prev => ({ ...prev, loading: false, error: err.message }));
+    }
+  };
+
+  const handleAcceptEnhanced = async () => {
+    if (!enhanceModal?.enhancedBase64) return;
+    const { item, enhancedBase64, enhancedMimeType } = enhanceModal;
+    try {
+      setEnhanceModal(prev => ({ ...prev, loading: true }));
+      // Convert base64 to file
+      const byteChars = atob(enhancedBase64);
+      const byteArr = new Uint8Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i);
+      const ext = enhancedMimeType.includes('png') ? 'png' : 'jpg';
+      const fileName = `${user.merchantProfileId}/${item.id}-enhanced-${Date.now()}.${ext}`;
+      const file = new File([byteArr], fileName, { type: enhancedMimeType });
+
+      const { url, error } = await uploadProductImage(file, fileName);
+      if (error) throw error;
+      await updateListedItemImage(item.id, fileName);
+      setListedItems(prev => prev.map(it =>
+        it.id === item.id ? { ...it, imageUrl: url, image_url: fileName } : it
+      ));
+      setEnhanceModal(null);
+    } catch (err) {
+      console.error('Failed to save enhanced image:', err);
+      setEnhanceModal(prev => ({ ...prev, loading: false, error: 'Failed to save. Try again.' }));
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -316,6 +405,15 @@ const InventoryDashboard = () => {
                 exit={{ opacity: 0, y: -10 }}
                 className="grid grid-cols-1 md:grid-cols-2 gap-4"
               >
+                {/* Hidden file input for product images */}
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleProductImageUpload}
+                />
+
                 {listedItems.length === 0 ? (
                   <div className="col-span-2 text-center py-16">
                     <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[#fdf2f6] flex items-center justify-center">
@@ -325,53 +423,108 @@ const InventoryDashboard = () => {
                     <p className="text-sm text-slate-400">Items you list for sale will appear here</p>
                   </div>
                 ) : (
-                  listedItems.map((item) => (
-                    <div key={item.id} className="bg-white p-5 rounded-2xl border border-[#f2d8e4]/50 shadow-sm hover:border-[#59112e]/20 hover:shadow-lg hover:shadow-[#59112e]/5 transition-all group relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#59112e]/5 to-transparent rounded-bl-full -mr-10 -mt-10"></div>
+                  listedItems.map((item) => {
+                    const isUploading = uploadingImageFor === 'loading_' + item.id;
+                    return (
+                      <div key={item.id} className="bg-white rounded-2xl border border-[#f2d8e4]/50 shadow-sm hover:border-[#59112e]/20 hover:shadow-lg hover:shadow-[#59112e]/5 transition-all group relative overflow-hidden">
 
-                      <div className="flex justify-between items-start mb-4 relative">
-                        <div className="w-12 h-12 rounded-xl bg-[#fdf2f6] text-[#59112e] flex items-center justify-center border border-[#f2d8e4] overflow-hidden">
+                        {/* ── Product Image Area ── */}
+                        <div className="relative w-full h-44 bg-gradient-to-br from-[#fdf2f6] to-[#f5e6ed] overflow-hidden">
                           {item.imageUrl ? (
-                            <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.parentNode.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>'; }} />
+                            <>
+                              <img
+                                src={item.imageUrl}
+                                alt={item.name}
+                                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                onError={(e) => { e.target.style.display = 'none'; }}
+                              />
+                              {/* Hover overlay with actions */}
+                              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-end justify-center pb-3 gap-2">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); triggerImageUpload(item); }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-sm text-slate-700 rounded-lg text-xs font-bold hover:bg-white transition-colors shadow-lg"
+                                >
+                                  <Camera size={14} /> Change
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleEnhanceImage(item); }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-lg text-xs font-bold hover:from-violet-600 hover:to-purple-700 transition-colors shadow-lg"
+                                >
+                                  <Sparkles size={14} /> Enhance with AI
+                                </button>
+                              </div>
+                            </>
                           ) : (
-                            <ShoppingCart size={22} />
+                            /* No image – upload placeholder */
+                            <div
+                              className="w-full h-full flex flex-col items-center justify-center cursor-pointer relative"
+                              onClick={() => triggerImageUpload(item)}
+                            >
+                              {isUploading ? (
+                                <Loader2 size={32} className="text-[#59112e]/50 animate-spin" />
+                              ) : (
+                                <>
+                                  <div className="w-14 h-14 rounded-2xl bg-white/60 flex items-center justify-center mb-2 border border-[#f2d8e4]">
+                                    <ImagePlus size={24} className="text-[#59112e]/40" />
+                                  </div>
+                                  <span className="text-xs font-semibold text-[#59112e]/40">Add Product Image</span>
+                                  {/* Hover CTA */}
+                                  <div className="absolute inset-0 bg-[#59112e]/10 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center">
+                                    <div className="bg-white px-4 py-2.5 rounded-xl shadow-xl text-[#59112e] font-bold text-sm flex items-center gap-2 border border-[#f2d8e4]">
+                                      <Camera size={16} /> Upload Image
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Uploading overlay */}
+                          {isUploading && item.imageUrl && (
+                            <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+                              <Loader2 size={28} className="text-[#59112e] animate-spin" />
+                            </div>
                           )}
                         </div>
-                        <span className="text-xs font-bold px-2 py-1 bg-[#fafafa] rounded-lg text-slate-500 border border-[#f0f0f0]">{item.platform}</span>
-                      </div>
 
-                      <h3 className="font-bold text-lg text-slate-800 mb-1">{item.name}</h3>
-                      <p className="text-sm text-slate-500 mb-4 font-mono">{item.sku}</p>
+                        {/* ── Card Content ── */}
+                        <div className="p-5">
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-bold text-lg text-slate-800 mb-0.5 truncate">{item.name}</h3>
+                              <p className="text-sm text-slate-500 font-mono">{item.sku}</p>
+                            </div>
+                            <span className="text-xs font-bold px-2 py-1 bg-[#fafafa] rounded-lg text-slate-500 border border-[#f0f0f0] shrink-0 ml-2">{item.platform}</span>
+                          </div>
 
-                      {/* MODIFIED FOOTER: Aligned to start to prevent button overlap */}
-                      <div className="flex items-center gap-6 pt-4 border-t border-[#f2d8e4]/30">
-                        <div>
-                          <div className="text-xs text-slate-500">Price</div>
-                          <div className="font-bold text-[#59112e]">{item.price}</div>
+                          <div className="flex items-center gap-6 pt-3 border-t border-[#f2d8e4]/30">
+                            <div>
+                              <div className="text-xs text-slate-500">Price</div>
+                              <div className="font-bold text-[#59112e]">{item.price}</div>
+                            </div>
+                            <div className="pl-6 border-l border-[#f2d8e4]">
+                              <div className="text-xs text-slate-500">Stock Level</div>
+                              <div className={`font-bold ${item.stock < 10 ? 'text-amber-600' : 'text-emerald-600'}`}>{item.stock} units</div>
+                            </div>
+                          </div>
+
+                          {/* Hover action buttons */}
+                          <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => handleRefill(item)}
+                              className="p-2 bg-[#fdf2f6] text-[#59112e] rounded-lg shadow-md hover:bg-[#59112e] hover:text-white transition-colors border border-[#f2d8e4]"
+                              title="Refill Stock"
+                            >
+                              <RotateCw size={18} />
+                            </button>
+                            <button className="p-2 bg-[#59112e] text-white rounded-lg shadow-lg hover:bg-[#450d24] transition-colors">
+                              <ArrowUpRight size={18} />
+                            </button>
+                          </div>
                         </div>
-
-                        {/* Moved Stock to left with divider */}
-                        <div className="pl-6 border-l border-[#f2d8e4]">
-                          <div className="text-xs text-slate-500">Stock Level</div>
-                          <div className={`font-bold ${item.stock < 10 ? 'text-amber-600' : 'text-emerald-600'}`}>{item.stock} units</div>
-                        </div>
                       </div>
-
-                      {/* Refill Button for Cards (Positions unchanged, but now background is clear) */}
-                      <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => handleRefill(item)}
-                          className="p-2 bg-[#fdf2f6] text-[#59112e] rounded-lg shadow-md hover:bg-[#59112e] hover:text-white transition-colors border border-[#f2d8e4]"
-                          title="Refill Stock"
-                        >
-                          <RotateCw size={18} />
-                        </button>
-                        <button className="p-2 bg-[#59112e] text-white rounded-lg shadow-lg hover:bg-[#450d24] transition-colors">
-                          <ArrowUpRight size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
 
               </motion.div>
@@ -498,6 +651,134 @@ const InventoryDashboard = () => {
         </div>
 
       </motion.div>
+
+      {/* ══════════════════════════════════════════════
+          AI IMAGE ENHANCEMENT COMPARISON MODAL
+      ══════════════════════════════════════════════ */}
+      <AnimatePresence>
+        {enhanceModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => !enhanceModal.loading && setEnhanceModal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+              className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex justify-between items-center p-6 pb-4 border-b border-[#f2d8e4]/50">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white shadow-lg">
+                    <Sparkles size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-800">AI Image Enhancement</h2>
+                    <p className="text-xs text-slate-500">{enhanceModal.item?.name}</p>
+                  </div>
+                </div>
+                {!enhanceModal.loading && (
+                  <button
+                    onClick={() => setEnhanceModal(null)}
+                    className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={20} />
+                  </button>
+                )}
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6">
+                {enhanceModal.loading && !enhanceModal.enhancedBase64 ? (
+                  /* Loading State */
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="relative">
+                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 flex items-center justify-center">
+                        <Loader2 size={36} className="text-purple-600 animate-spin" />
+                      </div>
+                      <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                        <Sparkles size={12} className="text-white" />
+                      </div>
+                    </div>
+                    <p className="mt-5 text-sm font-bold text-slate-700">Enhancing your image with AI...</p>
+                    <p className="mt-1 text-xs text-slate-400">Creating a premium e-commerce ready photo</p>
+                  </div>
+                ) : enhanceModal.error ? (
+                  /* Error State */
+                  <div className="flex flex-col items-center justify-center py-16">
+                    <div className="w-16 h-16 rounded-2xl bg-rose-50 flex items-center justify-center mb-4">
+                      <X size={28} className="text-rose-500" />
+                    </div>
+                    <p className="text-sm font-bold text-slate-700">Enhancement Failed</p>
+                    <p className="mt-1 text-xs text-slate-400 text-center max-w-xs">{enhanceModal.error}</p>
+                    <button
+                      onClick={() => setEnhanceModal(null)}
+                      className="mt-4 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-bold text-slate-600 transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                ) : (
+                  /* Comparison View */
+                  <>
+                    <div className="grid grid-cols-2 gap-5">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Original</span>
+                        </div>
+                        <div className="rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 aspect-square">
+                          <img src={enhanceModal.originalUrl} alt="Original" className="w-full h-full object-contain" />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Sparkles size={12} className="text-purple-500" />
+                          <span className="text-xs font-bold text-purple-600 uppercase tracking-wider">AI Enhanced</span>
+                        </div>
+                        <div className="rounded-2xl overflow-hidden border-2 border-purple-200 bg-slate-50 aspect-square ring-4 ring-purple-50">
+                          <img
+                            src={`data:${enhanceModal.enhancedMimeType};base64,${enhanceModal.enhancedBase64}`}
+                            alt="Enhanced"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-100">
+                      <button
+                        onClick={() => setEnhanceModal(null)}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm font-bold text-slate-600 transition-colors"
+                      >
+                        <X size={16} /> Keep Original
+                      </button>
+                      <button
+                        onClick={handleAcceptEnhanced}
+                        disabled={enhanceModal.loading}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg shadow-purple-200 disabled:opacity-50"
+                      >
+                        {enhanceModal.loading ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Check size={16} />
+                        )}
+                        Use Enhanced
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
     </div>
   );

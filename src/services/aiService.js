@@ -1,5 +1,6 @@
 const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`;
+const GEMINI_IMAGE_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${GEMINI_KEY}`;
 
 // ── System prompts per role ──
 const ROLE_CONTEXTS = {
@@ -149,6 +150,45 @@ ${JSON.stringify(sheetData)}`;
     }
 
     throw new Error('No response from Gemini AI');
+}
+
+// ── Enhance product image with AI ──
+export async function enhanceProductImage(base64Image, mimeType = 'image/jpeg') {
+    const prompt = `Please put the object of attention on a white background or similar premium background enhancing its attractiveness making it feel like it is listed on a well known e-commerce site without actually deceiving consumer by any unnecessary enhancement. Just the premium photo. Return ONLY the enhanced image, no text.`;
+
+    const res = await fetch(GEMINI_IMAGE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{
+                role: 'user',
+                parts: [
+                    { inlineData: { mimeType, data: base64Image } },
+                    { text: prompt },
+                ],
+            }],
+            generationConfig: {
+                responseModalities: ['IMAGE', 'TEXT'],
+                temperature: 0.4,
+            },
+        }),
+    });
+
+    const data = await res.json();
+    if (data.error) throw new Error(`Gemini API: ${data.error.message || JSON.stringify(data.error)}`);
+
+    if (data.candidates?.[0]?.content?.parts) {
+        for (const part of data.candidates[0].content.parts) {
+            if (part.inlineData) {
+                return {
+                    base64: part.inlineData.data,
+                    mimeType: part.inlineData.mimeType || 'image/png',
+                };
+            }
+        }
+    }
+
+    throw new Error('No enhanced image returned from Gemini');
 }
 
 // ── Enhance product description with AI ──

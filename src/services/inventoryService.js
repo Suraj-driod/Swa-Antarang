@@ -64,6 +64,19 @@ export async function deleteListedItem(id) {
     if (error) throw error;
 }
 
+// ── Image update ──
+
+export async function updateListedItemImage(itemId, imagePath) {
+    const { data, error } = await supabase
+        .from('inventory_listed')
+        .update({ image_url: imagePath, updated_at: new Date().toISOString() })
+        .eq('id', itemId)
+        .select()
+        .single();
+    if (error) throw error;
+    return data;
+}
+
 // ── Stock update helpers ──
 
 export async function updateRawStock(itemId, newStock) {
