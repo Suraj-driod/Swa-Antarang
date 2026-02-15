@@ -35,6 +35,9 @@ import DriverMapsPage from '../../pages/driver/DriverMapsPage';
 // --- Customer Pages ---
 import CustomerApp from '../../features/customer/CustomerApp';
 
+// --- Profile Page ---
+import ProfilePage from '../../pages/profile';
+
 export default function AppRouter() {
     return (
         <BrowserRouter>
@@ -50,6 +53,9 @@ export default function AppRouter() {
 
                         {/* ─── Protected Routes ─── */}
                         <Route element={<ProtectedRoute />}>
+
+                            {/* ── Profile (all roles) ── */}
+                            <Route path="/profile" element={<ProfilePage />} />
 
                             {/* ── Merchant ── */}
                             <Route element={<RoleRoute allowedRole="merchant" />}>

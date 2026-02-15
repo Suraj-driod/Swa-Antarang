@@ -110,7 +110,10 @@ const Navbar = ({ items = [], brandTitle = 'Swa-Antarang', brandSub = 'Platform'
           </button>
 
           {/* Profile */}
-          <div className="hidden sm:flex items-center gap-2 pl-2 pr-1.5 py-1.5 bg-white/80 backdrop-blur-xl border border-[#f2d8e4] rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer group">
+          <div
+            onClick={() => navigate('/profile')}
+            className="hidden sm:flex items-center gap-2 pl-2 pr-1.5 py-1.5 bg-white/80 backdrop-blur-xl border border-[#f2d8e4] rounded-full shadow-sm hover:shadow-md transition-all cursor-pointer group"
+          >
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#fdf2f6] to-[#fbcfe8] flex items-center justify-center text-[#59112e] border border-white">
               <User size={16} strokeWidth={2.5} />
             </div>
@@ -184,7 +187,10 @@ const Navbar = ({ items = [], brandTitle = 'Swa-Antarang', brandSub = 'Platform'
 
               {/* Mobile Profile Section */}
               <div className="sm:hidden border-t border-[#f2d8e4] p-3">
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#fdf2f6]">
+                <div
+                  onClick={() => { setMobileMenuOpen(false); navigate('/profile'); }}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#fdf2f6] cursor-pointer hover:bg-[#f2d8e4] transition-colors"
+                >
                   <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#59112e] to-[#9d174d] flex items-center justify-center text-white border border-white/20">
                     <User size={18} strokeWidth={2.5} />
                   </div>
