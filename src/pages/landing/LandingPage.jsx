@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Store, Truck, ShoppingBag, Package, ArrowRight, ArrowUpRight, Zap, Eye, Route } from 'lucide-react';
 
 const fade = {
-  hidden: { opacity: 0, y: 30 },
+  hidden: { opacity: 0, y: 24 },
   visible: (i = 0) => ({
     opacity: 1,
     y: 0,
@@ -17,39 +17,30 @@ const stagger = {
 
 export default function LandingPage() {
   return (
-    <div className="bg-dark">
+    <div className="bg-white">
 
       {/* ════════════════════════════════
-          HERO — Full Dark, Huge Type
+          HERO — Full Width, Huge Type
       ════════════════════════════════ */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-        {/* Grid background */}
-        <div className="absolute inset-0 hero-grid" />
-        {/* Glow */}
-        <div className="absolute inset-0 hero-glow" />
-        {/* Top-right blob */}
-        <div className="glow-blob w-[600px] h-[600px] bg-accent/10 -top-40 -right-40" />
-        {/* Bottom-left blob */}
-        <div className="glow-blob w-[500px] h-[500px] bg-primary/20 -bottom-32 -left-32" />
+      <section className="relative min-h-[95vh] flex items-center justify-center overflow-hidden">
+        {/* Subtle grid */}
+        <div className="absolute inset-0 section-grid" />
+        {/* Warm glow blobs */}
+        <div className="glow-blob w-[700px] h-[700px] bg-accent/8 -top-48 right-[-10%]" />
+        <div className="glow-blob w-[500px] h-[500px] bg-primary/6 bottom-[-10%] left-[-5%]" />
 
         <motion.div
-          className="relative z-10 max-w-6xl mx-auto px-6 sm:px-8 pt-24 pb-20 text-center"
+          className="relative z-10 max-w-5xl mx-auto px-6 sm:px-8 pt-28 pb-24 text-center"
           initial="hidden"
           animate="visible"
           variants={stagger}
         >
-          <motion.span
-            variants={fade}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-border-dark bg-white/5 text-white/50 text-xs font-outfit font-medium tracking-wider uppercase mb-10"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-            Network Protocol v1
-          </motion.span>
+          
 
           <motion.h1
             variants={fade}
             custom={1}
-            className="font-display text-5xl sm:text-7xl md:text-8xl lg:text-[6.5rem] font-bold text-white tracking-tight leading-[0.95]"
+            className="font-display text-5xl sm:text-7xl md:text-8xl lg:text-[6.5rem] font-bold text-text-main tracking-tight leading-[0.95]"
           >
             The Operating Layer
             <br />
@@ -61,7 +52,7 @@ export default function LandingPage() {
           <motion.p
             variants={fade}
             custom={2}
-            className="mt-8 sm:mt-10 text-lg sm:text-xl text-white/50 max-w-2xl mx-auto font-outfit leading-relaxed"
+            className="mt-8 sm:mt-10 text-lg sm:text-xl text-text-soft max-w-2xl mx-auto font-outfit leading-relaxed"
           >
             Swa-Antarang is a universal resource discovery protocol.
             <br className="hidden sm:block" />
@@ -77,26 +68,26 @@ export default function LandingPage() {
           >
             <Link
               to="/ui/Login"
-              className="group inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-white text-dark font-outfit font-semibold rounded-xl hover:bg-white/90 transition-all hover:shadow-2xl hover:shadow-white/10 text-base"
+              className="group inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-primary text-white font-outfit font-semibold rounded-xl hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/25 text-base"
             >
               Start Broadcasting
               <ArrowRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
             </Link>
             <a
               href="#how-it-works"
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 border border-border-dark text-white/70 font-outfit font-medium rounded-xl hover:border-white/30 hover:text-white transition-all text-base"
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 border-2 border-border-soft text-text-soft font-outfit font-medium rounded-xl hover:border-primary/30 hover:text-primary transition-all text-base"
             >
               See How It Works
             </a>
           </motion.div>
 
-          {/* Scroll indicator */}
+          {/* Scroll line */}
           <motion.div
             variants={fade}
             custom={5}
-            className="mt-20 flex justify-center"
+            className="mt-24 flex justify-center"
           >
-            <div className="w-px h-16 bg-gradient-to-b from-white/20 to-transparent" />
+            <div className="w-px h-16 bg-gradient-to-b from-border-soft to-transparent" />
           </motion.div>
         </motion.div>
       </section>
@@ -104,8 +95,8 @@ export default function LandingPage() {
       {/* ════════════════════════════════
           STATEMENT — Big Bold Paragraph
       ════════════════════════════════ */}
-      <section className="relative bg-dark py-28 sm:py-36 px-6 sm:px-8">
-        <div className="absolute inset-0 hero-grid opacity-50" />
+      <section className="relative bg-surface-warm py-28 sm:py-36 px-6 sm:px-8 overflow-hidden">
+        <div className="absolute inset-0 section-grid-warm" />
         <motion.div
           className="relative z-10 max-w-5xl mx-auto"
           initial="hidden"
@@ -115,10 +106,10 @@ export default function LandingPage() {
         >
           <motion.p
             variants={fade}
-            className="font-display text-3xl sm:text-4xl md:text-5xl font-medium text-white/90 leading-snug tracking-tight"
+            className="font-display text-3xl sm:text-4xl md:text-5xl font-medium text-text-main leading-snug tracking-tight"
           >
             Local commerce is broken into silos.{' '}
-            <span className="text-white/30">
+            <span className="text-text-muted">
               Merchants can&apos;t see demand. Drivers can&apos;t find loads.
               Customers can&apos;t find what&apos;s actually available nearby.
             </span>
@@ -134,9 +125,9 @@ export default function LandingPage() {
       </section>
 
       {/* ════════════════════════════════
-          PROBLEM — Dark Elevated
+          PROBLEM — Warm Tinted
       ════════════════════════════════ */}
-      <section id="problem" className="relative bg-dark-soft py-28 sm:py-36 px-6 sm:px-8">
+      <section id="problem" className="relative bg-white py-28 sm:py-36 px-6 sm:px-8">
         <div className="max-w-6xl mx-auto">
           <motion.div
             initial="hidden"
@@ -150,16 +141,16 @@ export default function LandingPage() {
             <motion.h2
               variants={fade}
               custom={1}
-              className="mt-4 font-display text-4xl sm:text-5xl md:text-6xl font-bold text-white tracking-tight leading-[1.05]"
+              className="mt-4 font-display text-4xl sm:text-5xl md:text-6xl font-bold text-text-main tracking-tight leading-[1.05]"
             >
               Three roles.
               <br />
-              <span className="text-white/30">Zero shared infrastructure.</span>
+              <span className="text-text-muted">Zero shared infrastructure.</span>
             </motion.h2>
           </motion.div>
 
           <motion.div
-            className="mt-16 grid md:grid-cols-3 gap-px bg-border-dark rounded-2xl overflow-hidden"
+            className="mt-16 grid md:grid-cols-3 gap-5"
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: '-100px' }}
@@ -185,11 +176,11 @@ export default function LandingPage() {
               <motion.div
                 key={item.num}
                 variants={fade}
-                className="bg-dark-muted p-8 sm:p-10"
+                className="group p-8 sm:p-10 rounded-2xl bg-surface-warm border border-border-light hover:border-accent/20 transition-all duration-500 hover:shadow-lg hover:shadow-accent/5"
               >
-                <span className="text-accent/40 font-outfit text-sm font-bold">{item.num}</span>
-                <h3 className="mt-4 text-xl font-outfit font-semibold text-white">{item.title}</h3>
-                <p className="mt-3 text-sm text-white/40 font-outfit leading-relaxed">{item.desc}</p>
+                <span className="text-accent/30 font-outfit text-sm font-bold group-hover:text-accent/60 transition-colors">{item.num}</span>
+                <h3 className="mt-4 text-xl font-outfit font-semibold text-text-main">{item.title}</h3>
+                <p className="mt-3 text-sm text-text-soft font-outfit leading-relaxed">{item.desc}</p>
               </motion.div>
             ))}
           </motion.div>
@@ -197,12 +188,11 @@ export default function LandingPage() {
       </section>
 
       {/* ════════════════════════════════
-          SOLUTION — Light Break
+          SOLUTION — Accent-Tinted
       ════════════════════════════════ */}
-      <section id="solution" className="relative bg-white py-28 sm:py-36 px-6 sm:px-8 overflow-hidden">
-        <div className="absolute inset-0 light-grid" />
-        {/* Accent glow */}
-        <div className="glow-blob w-[500px] h-[500px] bg-primary/5 top-0 right-0" />
+      <section id="solution" className="relative bg-surface-warm py-28 sm:py-36 px-6 sm:px-8 overflow-hidden">
+        <div className="absolute inset-0 section-grid-warm" />
+        <div className="glow-blob w-[500px] h-[500px] bg-accent/5 top-0 right-0" />
 
         <div className="relative z-10 max-w-6xl mx-auto">
           <motion.div
@@ -234,7 +224,7 @@ export default function LandingPage() {
           </motion.div>
 
           <motion.div
-            className="mt-20 grid md:grid-cols-3 gap-8"
+            className="mt-20 grid md:grid-cols-3 gap-6"
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: '-100px' }}
@@ -260,9 +250,9 @@ export default function LandingPage() {
               <motion.div
                 key={title}
                 variants={fade}
-                className="group relative p-8 rounded-2xl border border-gray-100 hover:border-accent/20 transition-all duration-500 hover:shadow-xl hover:shadow-accent/5"
+                className="group relative p-8 rounded-2xl bg-white border border-border-light hover:border-accent/20 transition-all duration-500 hover:shadow-xl hover:shadow-primary/5"
               >
-                <div className="w-12 h-12 rounded-xl bg-primary/5 flex items-center justify-center text-primary mb-6 group-hover:bg-primary group-hover:text-white transition-all duration-500">
+                <div className="w-12 h-12 rounded-xl bg-primary-soft flex items-center justify-center text-primary mb-6 group-hover:bg-primary group-hover:text-white transition-all duration-500">
                   <Icon size={22} />
                 </div>
                 <h3 className="text-lg font-outfit font-semibold text-text-main">{title}</h3>
@@ -274,10 +264,10 @@ export default function LandingPage() {
       </section>
 
       {/* ════════════════════════════════
-          ROLES — Dark, Editorial
+          ROLES — White, Editorial Cards
       ════════════════════════════════ */}
-      <section id="roles" className="relative bg-dark py-28 sm:py-36 px-6 sm:px-8">
-        <div className="absolute inset-0 hero-grid opacity-30" />
+      <section id="roles" className="relative bg-white py-28 sm:py-36 px-6 sm:px-8">
+        <div className="absolute inset-0 section-grid" />
         <div className="relative z-10 max-w-6xl mx-auto">
           <motion.div
             initial="hidden"
@@ -291,11 +281,11 @@ export default function LandingPage() {
             <motion.h2
               variants={fade}
               custom={1}
-              className="mt-4 font-display text-4xl sm:text-5xl md:text-6xl font-bold text-white tracking-tight leading-[1.05]"
+              className="mt-4 font-display text-4xl sm:text-5xl md:text-6xl font-bold text-text-main tracking-tight leading-[1.05]"
             >
               Three perspectives.
               <br />
-              <span className="text-white/30">One network truth.</span>
+              <span className="text-text-muted">One network truth.</span>
             </motion.h2>
           </motion.div>
 
@@ -313,6 +303,7 @@ export default function LandingPage() {
                 title: 'Broadcast & Fulfill',
                 desc: 'Manage inventory, broadcast availability across the network, and fulfill orders in real-time. Your shop — visible to the whole city.',
                 gradient: 'from-primary to-accent',
+                bg: 'bg-primary-soft',
               },
               {
                 icon: Truck,
@@ -320,6 +311,7 @@ export default function LandingPage() {
                 title: 'Move & Earn',
                 desc: 'Accept deliveries matched to your route, optimize with live maps, and earn with transparent payouts. No dispatcher needed.',
                 gradient: 'from-[#4a1024] to-primary',
+                bg: 'bg-[#fef2f5]',
               },
               {
                 icon: ShoppingBag,
@@ -327,27 +319,28 @@ export default function LandingPage() {
                 title: 'Discover & Track',
                 desc: 'Browse real-time local inventory, place orders from any merchant on the network, and track delivery to your door.',
                 gradient: 'from-[#1a5c3a] to-[#2d8a5e]',
+                bg: 'bg-[#f0fdf4]',
               },
-            ].map(({ icon: Icon, label, title, desc, gradient }) => (
+            ].map(({ icon: Icon, label, title, desc, gradient, bg }) => (
               <motion.div
                 key={label}
                 variants={fade}
-                className="group relative rounded-2xl border border-border-dark bg-dark-muted overflow-hidden hover:border-white/15 transition-all duration-500"
+                className="group relative rounded-2xl border border-border-light bg-white overflow-hidden hover:border-accent/20 hover:shadow-xl hover:shadow-primary/5 transition-all duration-500"
               >
                 {/* Top gradient bar */}
                 <div className={`h-1 w-full bg-gradient-to-r ${gradient}`} />
                 <div className="p-8 sm:p-10">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white mb-6`}>
+                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white mb-6 shadow-md`}>
                     <Icon size={22} />
                   </div>
-                  <span className="text-xs font-outfit font-semibold tracking-wider uppercase text-white/30">
+                  <span className="text-xs font-outfit font-semibold tracking-wider uppercase text-text-muted">
                     For {label}
                   </span>
-                  <h3 className="mt-2 text-2xl font-outfit font-bold text-white">{title}</h3>
-                  <p className="mt-4 text-sm text-white/40 font-outfit leading-relaxed">{desc}</p>
+                  <h3 className="mt-2 text-2xl font-outfit font-bold text-text-main">{title}</h3>
+                  <p className="mt-4 text-sm text-text-soft font-outfit leading-relaxed">{desc}</p>
                   <Link
                     to="/ui/Login"
-                    className="mt-6 inline-flex items-center gap-1.5 text-sm font-outfit font-medium text-accent hover:text-white transition-colors"
+                    className="mt-6 inline-flex items-center gap-1.5 text-sm font-outfit font-medium text-accent hover:text-primary transition-colors"
                   >
                     Enter as {label}
                     <ArrowUpRight size={14} />
@@ -360,10 +353,10 @@ export default function LandingPage() {
       </section>
 
       {/* ════════════════════════════════
-          HOW IT WORKS — Light, Minimal Timeline
+          HOW IT WORKS — Warm, Minimal Timeline
       ════════════════════════════════ */}
-      <section id="how-it-works" className="relative bg-white py-28 sm:py-36 px-6 sm:px-8">
-        <div className="absolute inset-0 light-grid" />
+      <section id="how-it-works" className="relative bg-surface-warm py-28 sm:py-36 px-6 sm:px-8">
+        <div className="absolute inset-0 section-grid-warm" />
         <div className="relative z-10 max-w-4xl mx-auto">
           <motion.div
             initial="hidden"
@@ -402,7 +395,7 @@ export default function LandingPage() {
                 key={step}
                 variants={fade}
                 custom={i}
-                className="group flex gap-6 sm:gap-10 py-8 border-b border-gray-100 last:border-0"
+                className="group flex gap-6 sm:gap-10 py-8 border-b border-border-light last:border-0"
               >
                 <span className="flex-shrink-0 w-12 text-3xl font-outfit font-bold text-accent/20 group-hover:text-accent transition-colors duration-500">
                   {step}
@@ -420,12 +413,12 @@ export default function LandingPage() {
       </section>
 
       {/* ════════════════════════════════
-          CTA — Dark, Dramatic
+          CTA — Brand Gradient
       ════════════════════════════════ */}
-      <section className="relative bg-dark py-32 sm:py-40 px-6 sm:px-8 overflow-hidden">
-        <div className="absolute inset-0 hero-glow-strong" />
-        <div className="absolute inset-0 hero-grid opacity-40" />
-        <div className="glow-blob w-[600px] h-[400px] bg-accent/10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+      <section className="relative bg-gradient-to-br from-primary via-primary to-[#7a1d40] py-32 sm:py-40 px-6 sm:px-8 overflow-hidden">
+        {/* Decorative orbs */}
+        <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-white/5 blur-[100px]" />
+        <div className="absolute bottom-0 left-0 w-80 h-80 rounded-full bg-accent/10 blur-[100px]" />
 
         <motion.div
           className="relative z-10 max-w-3xl mx-auto text-center"
@@ -440,12 +433,12 @@ export default function LandingPage() {
           >
             Ready to join
             <br />
-            <span className="text-gradient italic">the network?</span>
+            <span className="italic opacity-80">the network?</span>
           </motion.h2>
           <motion.p
             variants={fade}
             custom={1}
-            className="mt-6 text-lg text-white/50 font-outfit max-w-lg mx-auto"
+            className="mt-6 text-lg text-white/70 font-outfit max-w-lg mx-auto"
           >
             Connect your business to Swa-Antarang.
             Start broadcasting, moving, and trading today.
@@ -457,14 +450,14 @@ export default function LandingPage() {
           >
             <Link
               to="/ui/Login"
-              className="group inline-flex items-center justify-center gap-2.5 px-10 py-4.5 bg-white text-dark font-outfit font-semibold rounded-xl hover:bg-white/90 transition-all hover:shadow-2xl hover:shadow-white/10 text-base"
+              className="group inline-flex items-center justify-center gap-2.5 px-10 py-4.5 bg-white text-primary font-outfit font-semibold rounded-xl hover:bg-white/95 transition-all shadow-xl shadow-black/10 text-base"
             >
               Get Started
               <ArrowRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
             </Link>
             <a
               href="#roles"
-              className="inline-flex items-center justify-center gap-2 px-8 py-4 border border-border-dark text-white/60 font-outfit font-medium rounded-xl hover:border-white/30 hover:text-white transition-all text-base"
+              className="inline-flex items-center justify-center gap-2 px-8 py-4 border border-white/20 text-white/80 font-outfit font-medium rounded-xl hover:border-white/40 hover:text-white transition-all text-base"
             >
               Explore Roles
             </a>
@@ -475,21 +468,21 @@ export default function LandingPage() {
       {/* ════════════════════════════════
           FOOTER
       ════════════════════════════════ */}
-      <footer className="bg-dark border-t border-border-dark py-14 px-6 sm:px-8">
+      <footer className="bg-white border-t border-border-soft py-14 px-6 sm:px-8">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-8">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center text-white">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white">
               <Package size={16} />
             </div>
-            <span className="font-outfit font-bold text-white">Swa-Antarang</span>
+            <span className="font-display font-bold text-text-main">Swa-Antarang</span>
           </div>
           <nav className="flex flex-wrap justify-center gap-8 text-sm font-outfit">
-            <a href="#" className="text-white/30 hover:text-white transition-colors">About</a>
-            <a href="#" className="text-white/30 hover:text-white transition-colors">Contact</a>
-            <a href="#" className="text-white/30 hover:text-white transition-colors">Terms</a>
-            <Link to="/ui/Login" className="text-white/30 hover:text-white transition-colors">Login</Link>
+            <a href="#" className="text-text-muted hover:text-primary transition-colors">About</a>
+            <a href="#" className="text-text-muted hover:text-primary transition-colors">Contact</a>
+            <a href="#" className="text-text-muted hover:text-primary transition-colors">Terms</a>
+            <Link to="/ui/Login" className="text-text-muted hover:text-primary transition-colors">Login</Link>
           </nav>
-          <span className="text-xs text-white/20 font-outfit">
+          <span className="text-xs text-text-muted font-outfit">
             &copy; {new Date().getFullYear()} Swa-Antarang
           </span>
         </div>

@@ -32,7 +32,7 @@ const Navbar = ({ items = [], brandTitle = 'Swa-Antarang', brandSub = 'Platform'
 
         {/* --- LEFT: BRAND ISLAND --- */}
         <div className="pointer-events-auto">
-          <div className="flex items-center gap-3 bg-white/80 backdrop-blur-xl border border-[#fbcfe8] px-4 py-2.5 rounded-full shadow-[0_4px_20px_-4px_rgba(89,17,46,0.08)] ring-1 ring-white/50 group cursor-pointer transition-all hover:scale-[1.02]">
+          <Link to="/" className="flex items-center gap-3 bg-white/80 backdrop-blur-xl border border-[#fbcfe8] px-4 py-2.5 rounded-full shadow-[0_4px_20px_-4px_rgba(89,17,46,0.08)] ring-1 ring-white/50 group cursor-pointer transition-all hover:scale-[1.02]">
             <div className="relative">
               <div className="absolute inset-0 bg-[#59112e] rounded-full blur-md opacity-20 group-hover:opacity-40 transition-opacity"></div>
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#59112e] to-[#9d174d] flex items-center justify-center text-white shadow-md relative z-10">
@@ -43,7 +43,7 @@ const Navbar = ({ items = [], brandTitle = 'Swa-Antarang', brandSub = 'Platform'
               <h1 className="text-sm font-bold text-[#2d0b16] leading-none tracking-tight">{brandTitle}</h1>
               <p className="text-[10px] text-[#9d174d] font-medium tracking-wide opacity-80">{brandSub}</p>
             </div>
-          </div>
+          </Link>
         </div>
 
         {/* --- CENTER: NAVIGATION CAPSULE (Desktop) --- */}

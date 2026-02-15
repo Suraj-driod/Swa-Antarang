@@ -15,7 +15,7 @@ export default function PublicLayout() {
   const isAuthenticated = !!user;
 
   return (
-    <div className="min-h-dvh">
+    <div className="min-h-dvh bg-white">
       {isAuthenticated ? (
         <Navbar
           items={roleNavMap[user.role] || []}

@@ -10,42 +10,21 @@
 @import 'tailwindcss';
 
 /* ===========================
-   HERO GRID BACKGROUND
+   SUBTLE GRID BACKGROUNDS
 =========================== */
 
-@utility hero-grid {
+@utility section-grid {
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 64px 64px;
+    linear-gradient(rgba(89, 17, 46, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(89, 17, 46, 0.03) 1px, transparent 1px);
+  background-size: 72px 72px;
 }
 
-@utility hero-glow {
-  background: radial-gradient(
-    ellipse 60% 50% at 50% 40%,
-    rgba(201, 52, 91, 0.08) 0%,
-    transparent 70%
-  );
-}
-
-@utility hero-glow-strong {
-  background: radial-gradient(
-    ellipse 50% 40% at 50% 50%,
-    rgba(201, 52, 91, 0.15) 0%,
-    rgba(89, 17, 46, 0.05) 40%,
-    transparent 70%
-  );
-}
-
-/* ===========================
-   SECTION GRID (LIGHT)
-=========================== */
-
-@utility light-grid {
+@utility section-grid-warm {
   background-image:
-    linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
-  background-size: 64px 64px;
+    linear-gradient(rgba(89, 17, 46, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(89, 17, 46, 0.04) 1px, transparent 1px);
+  background-size: 72px 72px;
 }
 
 /* ===========================
@@ -66,23 +45,19 @@
 @utility glow-blob {
   position: absolute;
   border-radius: 9999px;
-  filter: blur(120px);
+  filter: blur(140px);
   pointer-events: none;
 }
 
 /* ===========================
-   SMOOTH SCROLL
+   SMOOTH SCROLL + SELECTION
 =========================== */
 
 html {
   scroll-behavior: smooth;
 }
 
-/* ===========================
-   SELECTION
-=========================== */
-
 ::selection {
-  background: rgba(201, 52, 91, 0.2);
+  background: rgba(201, 52, 91, 0.15);
   color: inherit;
 }
