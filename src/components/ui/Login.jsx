@@ -162,7 +162,16 @@ const AuthScreen = () => {
 
         try {
             if (isLogin) {
+                console.log('🔐 Starting login...');
+                // Start a timer to show "still loading" message if it takes too long
+                const slowTimer = setTimeout(() => {
+                    console.warn('⏱️ Login is taking longer than expected. Your connection might be slow.');
+                }, 8000);
+                
                 const result = await login(email, password);
+                clearTimeout(slowTimer);
+                console.log('✨ Login successful, navigating to dashboard');
+                
                 // Navigate based on the actual profile role, not the selected tab
                 const targetRole = result.profile?.role || role;
                 navigate(DASHBOARD_MAP[targetRole], { replace: true });
@@ -173,11 +182,20 @@ const AuthScreen = () => {
                     ...(userType === 'merchant' && { business_name: nameField }),
                     ...(userType === 'delivery' && { vehicle_type: '' }),
                 };
+                
+                console.log('📝 Starting signup...');
+                // Start a timer to show "still loading" message if it takes too long
+                const slowTimer = setTimeout(() => {
+                    console.warn('⏱️ Signup is taking longer than expected. Your connection might be slow.');
+                }, 8000);
+                
                 await signUp(email, password, metadata);
+                clearTimeout(slowTimer);
+                console.log('✨ Signup successful, navigating to dashboard');
                 navigate(DASHBOARD_MAP[role], { replace: true });
             }
         } catch (err) {
-            console.error('Auth error:', err);
+            console.error('❌ Auth error:', err);
             setError(err.message || 'Authentication failed. Please try again.');
         } finally {
             setSubmitting(false);
@@ -295,7 +313,7 @@ const AuthScreen = () => {
                         <AnimatePresence mode="popLayout">
                             {/* Name field (signup only) */}
                             {!isLogin && (
-                                <motion.div variants={fadeIn} initial="hidden" animate="visible" exit="exit" className="space-y-1.5">
+                                <motion.div key="name-field" variants={fadeIn} initial="hidden" animate="visible" exit="exit" className="space-y-1.5">
                                     <label className="text-xs font-bold uppercase tracking-wider text-primary/60 ml-1">
                                         {config.placeholder}
                                     </label>
@@ -315,7 +333,7 @@ const AuthScreen = () => {
                             )}
 
                             {/* Email */}
-                            <motion.div layout className="space-y-1.5">
+                            <motion.div key="email-field" layout className="space-y-1.5">
                                 <label className="text-xs font-bold uppercase tracking-wider text-primary/60 ml-1">Email</label>
                                 <div className="relative group">
                                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors" size={20} />
@@ -332,7 +350,7 @@ const AuthScreen = () => {
 
                             {/* Aadhaar upload (signup only) */}
                             {!isLogin && (
-                                <motion.div variants={fadeIn} initial="hidden" animate="visible" exit="exit" className="space-y-1.5 pt-1">
+                                <motion.div key="aadhaar-field" variants={fadeIn} initial="hidden" animate="visible" exit="exit" className="space-y-1.5 pt-1">
                                     <label className="text-xs font-bold uppercase tracking-wider text-primary/60 ml-1">Identity Proof</label>
                                     <div className="relative">
                                         <input type="file" id="aadhaar" className="hidden" onChange={(e) => {
@@ -354,7 +372,7 @@ const AuthScreen = () => {
                             )}
 
                             {/* Password */}
-                            <motion.div layout className="space-y-1.5">
+                            <motion.div key="password-field" layout className="space-y-1.5">
                                 <div className="flex justify-between ml-1">
                                     <label className="text-xs font-bold uppercase tracking-wider text-primary/60">Password</label>
                                     {isLogin && <a href="#" className="text-xs font-bold text-primary hover:underline">Forgot?</a>}

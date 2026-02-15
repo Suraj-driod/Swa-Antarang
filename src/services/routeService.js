@@ -48,41 +48,37 @@ export async function geocodeAddress(address) {
     }
 }
 
-// ── TomTom Waypoint Optimization ──
+// ── OSRM Waypoint Optimization (Free - No API Key Needed) ──
 export async function optimizeWaypoints(origin, destinations) {
     try {
-        // Build waypoints string: origin:lat,lng:destinations
-        const waypoints = [
-            `${origin.lat},${origin.lng}`,
-            ...destinations.map(d => `${d.lat},${d.lng}`)
-        ];
-
-        // TomTom Waypoint Optimization API
-        const url = `${TOMTOM_BASE}/routing/waypointoptimization/1?key=${TOMTOM_KEY}`;
-        const body = {
-            waypoints: waypoints.map((wp, i) => ({
-                point: { latitude: parseFloat(wp.split(',')[0]), longitude: parseFloat(wp.split(',')[1]) },
-            })),
-            options: {
-                travelMode: 'car',
-                vehicleHeading: 0,
-            }
-        };
-
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        });
-        const data = await res.json();
-
-        if (data.optimizedOrder) {
-            return data.optimizedOrder;
+        const waypoints = [origin, ...destinations];
+        
+        // Use OSRM free routing service for TSP (Traveling Salesman Problem) optimization
+        const coords = waypoints.map(w => `${w.lng},${w.lat}`).join(';');
+        const osrmUrl = `https://router.project-osrm.org/trip/v1/driving/${coords}?roundtrip=false&source=first&destination=last`;
+        
+        console.log('🗺️ Optimizing waypoints with OSRM:', osrmUrl);
+        
+        const res = await fetch(osrmUrl);
+        if (!res.ok) {
+            throw new Error(`OSRM API error: ${res.status} ${res.statusText}`);
         }
-        // Fallback: return original order
+        
+        const data = await res.json();
+        console.log('✅ OSRM optimization response:', data);
+
+        if (data.trips && data.trips.length > 0) {
+            const orderedWaypoints = data.trips[0].waypoint_order;
+            console.log('📍 Optimized waypoint order:', orderedWaypoints);
+            return orderedWaypoints.map(idx => idx + 1); // Convert to 1-based indexing for display
+        }
+        
+        // Fallback: return original order if no trips returned
+        console.warn('⚠️ No trips in OSRM response, using original order');
         return destinations.map((_, i) => i + 1);
     } catch (err) {
-        console.error('Waypoint optimization error:', err);
+        console.error('❌ Waypoint optimization error:', err);
+        // Fallback: return original order if optimization fails
         return destinations.map((_, i) => i + 1);
     }
 }
@@ -371,24 +367,38 @@ export async function saveOptimizedRoute(merchantId, driverId, routeData) {
 
 // ── Get assigned route for driver ──
 export async function getAssignedRoute(driverProfileId) {
+    console.log('Fetching assigned route for driver:', driverProfileId);
+    
+    // First, get basic delivery records
     const { data, error } = await supabase
         .from('deliveries')
-        .select('*, orders(*, order_items(*), merchant_profiles!merchant_id(business_name, address, lat, lng))')
+        .select('id, order_id, status, gps_log, created_at, driver_id')
         .eq('driver_id', driverProfileId)
         .neq('status', 'delivered')
         .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+        console.error('Error fetching deliveries:', error);
+        throw error;
+    }
+
+    console.log('Deliveries fetched:', data);
 
     // Find the most recent route plan from gps_log
-    const withRoute = data?.find(d => d.gps_log && d.gps_log.stops);
+    const withRoute = data?.find(d => {
+        console.log('Checking delivery:', d.id, 'gps_log:', d.gps_log);
+        return d.gps_log && d.gps_log.stops && Array.isArray(d.gps_log.stops) && d.gps_log.stops.length > 0;
+    });
+    
     if (withRoute) {
+        console.log('Route found:', withRoute.gps_log);
         return {
             routePlan: withRoute.gps_log,
             deliveries: data,
         };
     }
 
+    console.log('No route with valid stops found');
     return { routePlan: null, deliveries: data || [] };
 }
 

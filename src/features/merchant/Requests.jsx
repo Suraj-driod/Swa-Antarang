@@ -25,6 +25,7 @@ import {
 import { useAuth } from '../../app/providers/AuthContext';
 import { getB2bRequestsAsSeller } from '../../services/b2bService';
 import { getOrdersByMerchant, confirmOrder, setLogistics } from '../../services/orderService';
+import { chatWithGemini } from '../../services/aiService';
 
 // --- COMPONENTS ---
 
@@ -33,8 +34,8 @@ const DeliveryOption = ({ icon: Icon, title, desc, delay, cost, selected, onClic
     <button
         onClick={onClick}
         className={`w-full p-4 rounded-2xl border-2 transition-all duration-200 flex items-center gap-4 text-left group relative overflow-hidden ${selected
-                ? 'border-[#59112e] bg-[#fdf2f6]'
-                : 'border-gray-100 bg-white hover:border-[#59112e]/30 hover:shadow-md'
+            ? 'border-[#59112e] bg-[#fdf2f6]'
+            : 'border-gray-100 bg-white hover:border-[#59112e]/30 hover:shadow-md'
             }`}
     >
         <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${selected ? 'bg-[#59112e] text-white' : 'bg-gray-50 text-gray-500 group-hover:text-[#59112e] group-hover:bg-[#fdf2f6]'
@@ -69,8 +70,8 @@ const ChatBubble = ({ msg }) => (
             {msg.sender === 'ai' ? <Sparkles size={14} /> : <User size={14} />}
         </div>
         <div className={`max-w-[80%] p-3 rounded-2xl text-xs leading-relaxed shadow-sm ${msg.sender === 'ai'
-                ? 'bg-white border border-[#f2d8e4] text-[#2d0b16] rounded-tl-none'
-                : 'bg-[#59112e] text-white rounded-tr-none shadow-[#59112e]/20'
+            ? 'bg-white border border-[#f2d8e4] text-[#2d0b16] rounded-tl-none'
+            : 'bg-[#59112e] text-white rounded-tr-none shadow-[#59112e]/20'
             }`}>
             {msg.content}
         </div>
@@ -91,6 +92,8 @@ const RequestsPanel = () => {
         { id: 1, sender: 'ai', content: "Hello! I've analyzed your incoming requests. You have high-value offers pending. Shall I summarize the best margins?" }
     ]);
     const messagesEndRef = useRef(null);
+    const chatHistoryRef = useRef([]);
+    const [isAiLoading, setIsAiLoading] = useState(false);
 
     // Fetch requests
     useEffect(() => {
@@ -129,13 +132,22 @@ const RequestsPanel = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    const handleSendMessage = () => {
-        if (!chatInput.trim()) return;
-        setMessages(prev => [...prev, { id: Date.now(), sender: 'user', content: chatInput }]);
+    const handleSendMessage = async () => {
+        if (!chatInput.trim() || isAiLoading) return;
+        const text = chatInput;
+        setMessages(prev => [...prev, { id: Date.now(), sender: 'user', content: text }]);
         setChatInput("");
-        setTimeout(() => {
-            setMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: "I'm processing that request against your inventory levels..." }]);
-        }, 1000);
+        chatHistoryRef.current.push({ role: 'user', text });
+        setIsAiLoading(true);
+        try {
+            const reply = await chatWithGemini(chatHistoryRef.current, 'merchant');
+            chatHistoryRef.current.push({ role: 'model', text: reply });
+            setMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: reply }]);
+        } catch {
+            setMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: "Sorry, I couldn't process that. Please try again." }]);
+        } finally {
+            setIsAiLoading(false);
+        }
     };
 
     const handleAccept = (req) => {
@@ -324,6 +336,20 @@ const RequestsPanel = () => {
                     {messages.map(msg => (
                         <ChatBubble key={msg.id} msg={msg} />
                     ))}
+                    {isAiLoading && (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 mb-4">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-[#59112e] to-[#851e45] text-white shadow-sm">
+                                <Bot size={16} />
+                            </div>
+                            <div className="bg-white border border-[#f2d8e4] p-3.5 rounded-2xl rounded-tl-none shadow-sm">
+                                <div className="flex gap-1.5">
+                                    <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                                    <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                                    <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
                     <div ref={messagesEndRef} />
                 </div>
 
@@ -442,8 +468,8 @@ const RequestsPanel = () => {
                                     disabled={!deliveryType}
                                     onClick={handleConfirmOrder}
                                     className={`w-full py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg ${deliveryType
-                                            ? 'bg-[#59112e] text-white shadow-[#59112e]/20 hover:scale-[1.02] hover:bg-[#450d24]'
-                                            : 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
+                                        ? 'bg-[#59112e] text-white shadow-[#59112e]/20 hover:scale-[1.02] hover:bg-[#450d24]'
+                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed shadow-none'
                                         }`}
                                 >
                                     <span>Confirm & Ship</span>

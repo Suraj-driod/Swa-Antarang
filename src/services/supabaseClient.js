@@ -7,10 +7,11 @@ export const supabase = createClient(
     import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
     {
         auth: {
+            storage: window.localStorage,
             persistSession: true,
             storageKey: STORAGE_KEY,
             autoRefreshToken: true,
-            detectSessionInUrl: true,
+            detectSessionInUrl: false, // Disabled: saves 200-500ms on re-logins (no magic links/OAuth)
         },
     }
 );

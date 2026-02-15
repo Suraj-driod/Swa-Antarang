@@ -126,14 +126,16 @@ export function AuthProvider({ children }) {
                     return;
                 }
 
-                if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+                if (event === 'TOKEN_REFRESHED' && session?.user) {
                     try {
+                        console.log('🔄 Token refreshed, updating profile cache');
                         const profile = await loadProfile(session.user.id);
                         if (mountedRef.current) {
                             if (profile) setUser(profile);
                             else await cleanSession();
                         }
-                    } catch {
+                    } catch (err) {
+                        console.error('❌ Profile refresh failed:', err.message);
                         if (mountedRef.current) await cleanSession();
                     }
                 }
@@ -148,11 +150,15 @@ export function AuthProvider({ children }) {
 
     // ── Login: clear stale session first, then sign in ──
     const login = useCallback(async (email, password) => {
-        // Kill any stale/expired session locally to prevent conflicts
+        // Manually clear Supabase auth cookies to prevent ghost cookies interfering with new login
+        document.cookie = 'sb-access-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'sb-refresh-token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        
+        // Kill any stale/expired session globally to prevent conflicts
         try {
             const { data: { session: existing } } = await supabase.auth.getSession();
             if (existing) {
-                await supabase.auth.signOut({ scope: 'local' });
+                await supabase.auth.signOut({ scope: 'global' });
                 nukeAuthStorage();
             }
         } catch { /* safe to ignore */ }

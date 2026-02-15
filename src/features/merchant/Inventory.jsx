@@ -15,9 +15,11 @@ import {
   User,
   RotateCw
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../../app/providers/AuthContext';
-import { getRawInventory, getListedInventory } from '../../services/inventoryService';
+import { getRawInventory, getListedInventory, updateRawStock, bulkInsertRawItems, bulkInsertListedItems } from '../../services/inventoryService';
 import { getProductImageUrl } from '../../services/storageService';
+import { processExcelInventory } from '../../services/aiService';
 
 // Status map from DB enum to display
 const STATUS_MAP = {
@@ -78,7 +80,10 @@ const InventoryDashboard = () => {
     { id: 1, sender: 'ai', content: "Hi there! 👋 I'm your Inventory Assistant. You can upload an Excel sheet or paste a WhatsApp message to update stock instantly." }
   ]);
   const [inputValue, setInputValue] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [excelProcessing, setExcelProcessing] = useState(false);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -101,7 +106,7 @@ const InventoryDashboard = () => {
       })));
       setListedItems((listed || []).map(l => ({
         ...l,
-        price: `$${Number(l.price).toFixed(2)}`,
+        price: `₹${Number(l.price).toFixed(2)}`,
         views: 'N/A',
         imageUrl: getProductImageUrl(l.image_url),
       })));
@@ -132,21 +137,46 @@ const InventoryDashboard = () => {
   };
 
   const handleQuickAction = (type) => {
-    if (type === 'excel') {
-      const userMsg = { id: Date.now(), sender: 'user', content: "Importing Q1_Inventory.xlsx...", attachment: "Q1_Inventory.xlsx" };
-      setChatMessages(prev => [...prev, userMsg]);
-      setTimeout(() => {
-        setChatMessages(prev => [...prev, {
-          id: Date.now() + 1,
-          sender: 'ai',
-          content: "File processed! Added 124 new SKUs to your Raw Materials inventory."
-        }]);
-      }, 2000);
-    }
+    if (type === 'excel') fileInputRef.current?.click();
   };
 
-  const handleRefill = (itemName) => {
-    setInputValue(`Refill request for ${itemName}...`);
+  const handleRefill = (item) => {
+    const name = typeof item === 'object' && item?.name != null ? item.name : item;
+    setInputValue(`Refill request for ${name}...`);
+  };
+
+  const handleExcelUpload = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file || !user?.merchantProfileId) return;
+    setExcelProcessing(true);
+    const fileName = file.name;
+    setChatMessages(prev => [...prev, { id: Date.now(), sender: 'user', content: `Importing ${fileName}...`, attachment: fileName }]);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const firstSheet = wb.Sheets[wb.SheetNames[0]];
+      const sheetData = XLSX.utils.sheet_to_json(firstSheet);
+      const targetType = activeTab === 'raw' ? 'raw' : 'listed';
+      const items = await processExcelInventory(sheetData, targetType);
+      if (targetType === 'raw') {
+        await bulkInsertRawItems(user.merchantProfileId, items);
+      } else {
+        await bulkInsertListedItems(user.merchantProfileId, items);
+      }
+      const [raw, listed] = await Promise.all([
+        getRawInventory(user.merchantProfileId),
+        getListedInventory(user.merchantProfileId),
+      ]);
+      setRawItems((raw || []).map(r => ({ ...r, supplier: r.supplier_name, status: STATUS_MAP[r.status] || r.status })));
+      setListedItems((listed || []).map(l => ({ ...l, price: `₹${Number(l.price).toFixed(2)}`, views: 'N/A', imageUrl: getProductImageUrl(l.image_url) })));
+      setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: `File processed! Added ${items.length} items to your ${targetType === 'raw' ? 'Raw Materials' : 'Listed'} inventory.` }]);
+    } catch (err) {
+      console.error('Excel import error:', err);
+      setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: `Import failed: ${err?.message || 'Unknown error'}. Please try again.` }]);
+    } finally {
+      setExcelProcessing(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -265,7 +295,7 @@ const InventoryDashboard = () => {
                       <div className="col-span-2 text-right hidden md:flex items-center justify-end gap-2">
                         {/* Refill Button */}
                         <button
-                          onClick={() => handleRefill(item.name)}
+                          onClick={() => handleRefill(item)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fdf2f6] text-[#59112e] rounded-lg text-xs font-bold hover:bg-[#59112e] hover:text-white transition-colors border border-[#f2d8e4]"
                         >
                           <RotateCw size={14} /> Refill
@@ -330,7 +360,7 @@ const InventoryDashboard = () => {
                       {/* Refill Button for Cards (Positions unchanged, but now background is clear) */}
                       <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={() => handleRefill(item.name)}
+                          onClick={() => handleRefill(item)}
                           className="p-2 bg-[#fdf2f6] text-[#59112e] rounded-lg shadow-md hover:bg-[#59112e] hover:text-white transition-colors border border-[#f2d8e4]"
                           title="Refill Stock"
                         >
@@ -380,16 +410,28 @@ const InventoryDashboard = () => {
             </div>
           </div>
 
+          {/* Hidden file input for Excel */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={handleExcelUpload}
+          />
+
           {/* Quick Import Actions */}
           <div className="grid grid-cols-2 gap-2 mt-4">
             <button
               onClick={() => handleQuickAction('excel')}
-              className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl border border-[#f2d8e4] shadow-sm hover:border-[#59112e]/30 hover:shadow-md transition-all group"
+              disabled={excelProcessing}
+              className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl border border-[#f2d8e4] shadow-sm hover:border-[#59112e]/30 hover:shadow-md transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <div className="w-8 h-8 rounded-full bg-[#f0fdf4] text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <FileSpreadsheet size={16} />
+              <div className={`w-8 h-8 rounded-full bg-[#f0fdf4] text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform ${excelProcessing ? 'animate-spin' : ''}`}>
+                {excelProcessing ? <RotateCw size={16} /> : <FileSpreadsheet size={16} />}
               </div>
-              <span className="text-xs font-semibold text-slate-500 group-hover:text-[#59112e]">Excel Import</span>
+              <span className="text-xs font-semibold text-slate-500 group-hover:text-[#59112e]">
+                {excelProcessing ? 'Processing...' : 'Excel Import'}
+              </span>
             </button>
             <button
               onClick={() => { setInputValue("Copied from WhatsApp: Received 200 chairs from Zenith"); }}
@@ -408,6 +450,20 @@ const InventoryDashboard = () => {
           {chatMessages.map(msg => (
             <ChatMessage key={msg.id} msg={msg} />
           ))}
+          {isAiLoading && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-white shadow-sm bg-gradient-to-br from-[#59112e] to-[#851e45] text-white">
+                <Bot size={16} />
+              </div>
+              <div className="bg-white border border-[#f2d8e4] p-3.5 rounded-2xl rounded-tl-none shadow-sm">
+                <div className="flex gap-1.5">
+                  <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </motion.div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
@@ -430,7 +486,11 @@ const InventoryDashboard = () => {
             </button>
           </div>
           <div className="flex justify-between items-center mt-2 px-1">
-            <button className="text-slate-400 hover:text-[#59112e] transition-colors">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={excelProcessing}
+              className="text-slate-400 hover:text-[#59112e] transition-colors disabled:opacity-50"
+            >
               <Paperclip size={16} />
             </button>
             <span className="text-[10px] text-slate-400/70">AI processes natural language & files</span>

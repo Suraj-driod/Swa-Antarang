@@ -4,7 +4,9 @@ import { useAuth } from '../providers/AuthContext';
 export default function RoleRoute({ allowedRole }) {
     const { user, loading } = useAuth();
 
-    if (loading) {
+    // If still loading AND no user, show spinner (initial load)
+    // If user exists, render even if loading (allows faster transitions)
+    if (loading && !user) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-[#fdf2f6]">
                 <div className="w-10 h-10 border-4 border-[#59112e] border-t-transparent rounded-full animate-spin" />
