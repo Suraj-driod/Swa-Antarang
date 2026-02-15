@@ -22,69 +22,9 @@ import {
   Paperclip, 
   CornerDownLeft
 } from 'lucide-react';
-
-// --- MOCK DATA ---
-
-const B2B_REQUESTS = [
-  { 
-    id: 101, 
-    buyer: "Urban Furnishings Ltd.", 
-    type: "Broadcast Response", 
-    item: "Teak Wood Planks", 
-    qty: "500 Units", 
-    offer: "$4,200", 
-    distance: "12 km", 
-    time: "2h ago",
-    tags: ["Bulk", "Verified"] 
-  },
-  { 
-    id: 102, 
-    buyer: "BuildRight Construction", 
-    type: "Direct Request", 
-    item: "Steel Fasteners", 
-    qty: "2000 Units", 
-    offer: "$950", 
-    distance: "45 km", 
-    time: "5h ago",
-    tags: ["Urgent"] 
-  },
-  { 
-    id: 103, 
-    buyer: "HomeDecor Studio", 
-    type: "Negotiation", 
-    item: "Cotton Fabric Rolls", 
-    qty: "50 Rolls", 
-    offer: "$1,100", 
-    distance: "8 km", 
-    time: "1d ago",
-    tags: ["Repeat Buyer"] 
-  }
-];
-
-const B2C_REQUESTS = [
-  { 
-    id: 201, 
-    buyer: "Sarah Jenkins", 
-    type: "Online Order", 
-    item: "Ergonomic Chair", 
-    qty: "1 Unit", 
-    offer: "$120.00", 
-    distance: "5.2 km", 
-    time: "15m ago",
-    avatar: "S"
-  },
-  { 
-    id: 202, 
-    buyer: "Mike Ross", 
-    type: "Online Order", 
-    item: "Study Table (Minimalist)", 
-    qty: "1 Unit", 
-    offer: "$240.50", 
-    distance: "3.1 km", 
-    time: "1h ago",
-    avatar: "M"
-  }
-];
+import { useAuth } from '../../app/providers/AuthContext';
+import { getB2bRequestsAsSeller } from '../../services/b2bService';
+import { getOrdersByMerchant, confirmOrder, setLogistics } from '../../services/orderService';
 
 // --- COMPONENTS ---
 
@@ -141,18 +81,53 @@ const ChatBubble = ({ msg }) => (
 );
 
 const RequestsPanel = () => {
-  const [activeTab, setActiveTab] = useState('b2b'); // 'b2b' | 'b2c'
-  const [selectedRequest, setSelectedRequest] = useState(null); // For modal
-  const [deliveryType, setDeliveryType] = useState(null); // 'own' | 'ondc' | 'forward'
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('b2b');
+  const [b2bRequests, setB2bRequests] = useState([]);
+  const [b2cRequests, setB2cRequests] = useState([]);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [deliveryType, setDeliveryType] = useState(null);
   
   // Chat State
   const [chatInput, setChatInput] = useState("");
   const [messages, setMessages] = useState([
-      { id: 1, sender: 'ai', content: "Hello! I've analyzed your incoming requests. You have 3 high-value B2B offers pending. Shall I summarize the best margins?" }
+      { id: 1, sender: 'ai', content: "Hello! I've analyzed your incoming requests. You have high-value offers pending. Shall I summarize the best margins?" }
   ]);
   const messagesEndRef = useRef(null);
 
-  // Scroll to bottom of chat
+  // Fetch requests
+  useEffect(() => {
+    if (!user?.merchantProfileId) return;
+    getB2bRequestsAsSeller(user.merchantProfileId).then(data => {
+      setB2bRequests(data.map(r => ({
+        id: r.id,
+        buyer: r.merchant_profiles?.business_name || 'Unknown',
+        type: r.type === 'direct' ? 'Direct Request' : r.type === 'broadcast_response' ? 'Broadcast Response' : 'Negotiation',
+        item: r.item_ref,
+        qty: `${r.quantity} Units`,
+        offer: `$${Number(r.offer_amount || 0).toLocaleString()}`,
+        distance: '-',
+        time: new Date(r.created_at).toLocaleDateString(),
+        tags: r.type === 'direct' ? ['Direct'] : ['Broadcast'],
+      })));
+    }).catch(console.error);
+
+    getOrdersByMerchant(user.merchantProfileId).then(data => {
+      const b2c = data.filter(o => o.type === 'b2c' && o.status === 'pending');
+      setB2cRequests(b2c.map(o => ({
+        id: o.id,
+        buyer: o.profiles?.full_name || 'Customer',
+        type: 'Online Order',
+        item: o.order_items?.[0]?.product_name || 'Order',
+        qty: `${o.order_items?.reduce((a, i) => a + i.quantity, 0) || 0} Units`,
+        offer: `$${Number(o.total_amount).toFixed(2)}`,
+        distance: '-',
+        time: new Date(o.created_at).toLocaleDateString(),
+        avatar: (o.profiles?.full_name || 'C').charAt(0),
+      })));
+    }).catch(console.error);
+  }, [user?.merchantProfileId]);
+
   useEffect(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -171,9 +146,26 @@ const RequestsPanel = () => {
     setDeliveryType(null); // Reset selection
   };
 
-  const confirmOrder = () => {
-      alert(`Order confirmed with ${deliveryType}`);
+  const handleConfirmOrder = async () => {
+    if (!selectedRequest || !deliveryType) return;
+    try {
+      // For B2C orders, confirm the order and set logistics
+      if (activeTab === 'b2c') {
+        await confirmOrder(selectedRequest.id);
+        const logMap = { own: 'own_driver', ondc: 'ondc', forward: 'forward' };
+        await setLogistics(selectedRequest.id, logMap[deliveryType]);
+      }
+      // Remove from list
+      if (activeTab === 'b2c') {
+        setB2cRequests(prev => prev.filter(r => r.id !== selectedRequest.id));
+      } else {
+        setB2bRequests(prev => prev.filter(r => r.id !== selectedRequest.id));
+      }
       setSelectedRequest(null);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to confirm order');
+    }
   };
 
   return (
@@ -211,7 +203,7 @@ const RequestsPanel = () => {
                 >
                     <Building2 size={16} />
                     B2B Requests
-                    <span className="bg-[#59112e] text-white text-[10px] px-1.5 py-0.5 rounded-md ml-1">3</span>
+                    <span className="bg-[#59112e] text-white text-[10px] px-1.5 py-0.5 rounded-md ml-1">{b2bRequests.length}</span>
                 </button>
                 <button 
                     onClick={() => setActiveTab('b2c')}
@@ -221,7 +213,7 @@ const RequestsPanel = () => {
                 >
                     <ShoppingBag size={16} />
                     Consumer Orders
-                    <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.5 rounded-md ml-1">2</span>
+                    <span className="bg-emerald-500 text-white text-[10px] px-1.5 py-0.5 rounded-md ml-1">{b2cRequests.length}</span>
                 </button>
             </div>
         </div>
@@ -234,7 +226,7 @@ const RequestsPanel = () => {
                 animate={{ opacity: 1 }}
                 className="space-y-4 max-w-4xl"
             >
-                {(activeTab === 'b2b' ? B2B_REQUESTS : B2C_REQUESTS).map((req) => (
+                {(activeTab === 'b2b' ? b2bRequests : b2cRequests).map((req) => (
                     <motion.div 
                         key={req.id}
                         initial={{ opacity: 0, y: 10 }}
@@ -454,7 +446,7 @@ const RequestsPanel = () => {
                     <div className="p-6 pt-0">
                         <button 
                             disabled={!deliveryType}
-                            onClick={confirmOrder}
+                            onClick={handleConfirmOrder}
                             className={`w-full py-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg ${
                                 deliveryType 
                                 ? 'bg-[#59112e] text-white shadow-[#59112e]/20 hover:scale-[1.02] hover:bg-[#450d24]' 

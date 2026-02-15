@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, LayoutGroup } from 'framer-motion';
 import {
     MessageSquare,
@@ -14,55 +14,10 @@ import {
     ArrowLeft,
     ArrowRight
 } from 'lucide-react';
+import { useAuth } from '../../app/providers/AuthContext';
+import { createBroadcast, getMyBroadcasts, getMatchesForBuyer, acceptResponse, rejectResponse } from '../../services/propagationService';
 
-// --- MOCK DATA ---
-
-const MATCH_CARDS = [
-    {
-        id: 101,
-        company: "Acme Industrial Supply",
-        item: "Steel Fasteners (Bulk)",
-        price: "$0.45/unit",
-        distance: "4.2 km",
-        delivery: "2 Days",
-        verified: true,
-        rating: "98% On-time",
-        image: "bg-slate-700"
-    },
-    {
-        id: 102,
-        company: "Global Raw Materials",
-        item: "Aluminum Grade-A",
-        price: "$12.50/sheet",
-        distance: "12 km",
-        delivery: "Next Day",
-        verified: true,
-        rating: "4.8 ★",
-        image: "bg-stone-600"
-    },
-    {
-        id: 103,
-        company: "FastLogistics Hub",
-        item: "Steel Fasteners",
-        price: "$0.42/unit",
-        distance: "25 km",
-        delivery: "5 Days",
-        verified: false,
-        rating: "New Seller",
-        image: "bg-zinc-500"
-    },
-];
-
-const CHATS = [
-    { id: 1, name: "Office Chairs Ltd.", msg: "Can we negotiate the MOQ?", time: "2m ago", unread: true, initial: "O" },
-    { id: 2, name: "TechComponents Inc.", msg: "Offer received: $1.20/u", time: "2h ago", unread: false, initial: "T" },
-    { id: 3, name: "Global Textiles", msg: "Waiting for reply...", time: "1d ago", unread: false, initial: "G" },
-];
-
-const INITIAL_PROPAGATIONS = [
-    { id: 1, title: "Looking for: Raw Aluminum", radius: "20km", responses: 5, active: true },
-    { id: 2, title: "Selling: Surplus Teak", radius: "50km", responses: 12, active: true },
-];
+const BG_COLORS = ["bg-slate-700", "bg-stone-600", "bg-zinc-500", "bg-amber-700", "bg-indigo-600"];
 
 // --- COMPONENTS ---
 
@@ -76,8 +31,8 @@ const SwipeCard = ({ data, onSwipe, onNavigate }) => {
     const rotateLeftOpacity = useTransform(x, [-150, 0], [1, 0]);
 
     const handleDragEnd = (_, info) => {
-        if (info.offset.x > 100) onSwipe('right');
-        else if (info.offset.x < -100) onSwipe('left');
+        if (info.offset.x > 100) onSwipe?.('right');
+        else if (info.offset.x < -100) onSwipe?.('left');
     };
 
     return (
@@ -182,17 +137,48 @@ const SwipeCard = ({ data, onSwipe, onNavigate }) => {
 
 // 2. Main Dashboard Component
 const PropagationPanel = () => {
-    const [cards, setCards] = useState(MATCH_CARDS);
+    const { user } = useAuth();
+    const [cards, setCards] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [activePropagations, setActivePropagations] = useState(INITIAL_PROPAGATIONS);
+    const [activePropagations, setActivePropagations] = useState([]);
     const [showBroadcastModal, setShowBroadcastModal] = useState(false);
 
-    // Tab State for Right Panel
     const [rightPanelTab, setRightPanelTab] = useState('messages');
 
     // Form State
-    const [itemType, setItemType] = useState('Teak Wood Planks');
+    const [itemType, setItemType] = useState('');
     const [radius, setRadius] = useState(20);
+
+    // Chats placeholder (live chat is future scope)
+    const CHATS = [];
+
+    // Load live data
+    useEffect(() => {
+      if (!user?.merchantProfileId) return;
+      getMyBroadcasts(user.merchantProfileId).then(data => {
+        setActivePropagations(data.map(b => ({
+          id: b.id,
+          title: `Looking for: ${b.item_name}`,
+          radius: `${b.radius_km}km`,
+          responses: b.propagation_responses?.[0]?.count || 0,
+          active: b.status === 'active',
+        })));
+      }).catch(console.error);
+
+      getMatchesForBuyer(user.merchantProfileId).then(data => {
+        setCards(data.map((r, i) => ({
+          id: r.id,
+          company: r.merchant_profiles?.business_name || 'Unknown Seller',
+          item: r.item_name,
+          price: `$${Number(r.price).toFixed(2)}`,
+          distance: r.distance_km ? `${r.distance_km} km` : '-',
+          delivery: r.delivery_days ? `${r.delivery_days} Days` : '-',
+          verified: true,
+          rating: 'Seller',
+          image: BG_COLORS[i % BG_COLORS.length],
+        })));
+      }).catch(console.error);
+    }, [user?.merchantProfileId]);
 
     // Navigate carousel (wraps around)
     const handleNavigate = (direction) => {
@@ -205,10 +191,15 @@ const PropagationPanel = () => {
     };
 
     // Dismiss card (swipe accept/reject)
-    const handleSwipe = (id) => {
+    const handleSwipe = (id, direction) => {
+        // direction: 'right' = accept, 'left' = reject
+        if (direction === 'right') {
+            acceptResponse(id).catch(console.error);
+        } else {
+            rejectResponse(id).catch(console.error);
+        }
         setCards(prev => {
             const newCards = prev.filter(c => c.id !== id);
-            // Adjust index if needed
             if (currentIndex >= newCards.length && newCards.length > 0) {
                 setCurrentIndex(newCards.length - 1);
             } else if (newCards.length === 0) {
@@ -218,17 +209,26 @@ const PropagationPanel = () => {
         });
     };
 
-    const handleBroadcast = () => {
-        const newBroadcast = {
-            id: Date.now(),
-            title: `Looking for: ${itemType}`,
-            radius: `${radius}km`,
-            responses: 0,
-            active: true
-        };
-        setActivePropagations([newBroadcast, ...activePropagations]);
-        setShowBroadcastModal(false);
-        setRightPanelTab('broadcasts');
+    const handleBroadcast = async () => {
+        if (!user?.merchantProfileId || !itemType) return;
+        try {
+            const b = await createBroadcast(user.merchantProfileId, {
+                itemName: itemType,
+                radiusKm: Number(radius),
+            });
+            setActivePropagations(prev => [{
+                id: b.id,
+                title: `Looking for: ${b.item_name}`,
+                radius: `${b.radius_km}km`,
+                responses: 0,
+                active: true,
+            }, ...prev]);
+            setShowBroadcastModal(false);
+            setRightPanelTab('broadcasts');
+            setItemType('');
+        } catch (err) {
+            console.error(err);
+        }
     };
 
     return (
@@ -284,7 +284,7 @@ const PropagationPanel = () => {
                                         <SwipeCard
                                             key={cards[currentIndex].id}
                                             data={cards[currentIndex]}
-                                            onSwipe={() => handleSwipe(cards[currentIndex].id)}
+                                            onSwipe={(dir) => handleSwipe(cards[currentIndex].id, dir)}
                                             onNavigate={handleNavigate}
                                         />
                                     )}
@@ -297,7 +297,23 @@ const PropagationPanel = () => {
                                         </div>
                                         <h3 className="text-xl font-bold text-[#59112e]">No matches found</h3>
                                         <p className="text-sm text-[#6b4c59] mt-2 max-w-[200px]">We are broadcasting to more suppliers in your area...</p>
-                                        <button onClick={() => { setCards(MATCH_CARDS); setCurrentIndex(0); }} className="mt-8 px-6 py-2 bg-[#59112e] text-white rounded-xl text-sm font-bold shadow-lg hover:shadow-xl transition-all">
+                                        <button onClick={() => {
+                                            if (!user?.merchantProfileId) return;
+                                            getMatchesForBuyer(user.merchantProfileId).then(data => {
+                                                setCards(data.map((r, i) => ({
+                                                    id: r.id,
+                                                    company: r.merchant_profiles?.business_name || 'Unknown Seller',
+                                                    item: r.item_name,
+                                                    price: `$${Number(r.price).toFixed(2)}`,
+                                                    distance: r.distance_km ? `${r.distance_km} km` : '-',
+                                                    delivery: r.delivery_days ? `${r.delivery_days} Days` : '-',
+                                                    verified: true,
+                                                    rating: 'Seller',
+                                                    image: BG_COLORS[i % BG_COLORS.length],
+                                                })));
+                                                setCurrentIndex(0);
+                                            }).catch(console.error);
+                                        }} className="mt-8 px-6 py-2 bg-[#59112e] text-white rounded-xl text-sm font-bold shadow-lg hover:shadow-xl transition-all">
                                             Refresh Radar
                                         </button>
                                     </div>
@@ -340,7 +356,7 @@ const PropagationPanel = () => {
                         {/* Action Buttons (Bottom) */}
                         <div className="flex items-center gap-8 shrink-0">
                             <button
-                                onClick={() => cards.length > 0 && cards[currentIndex] && handleSwipe(cards[currentIndex].id)}
+                                onClick={() => cards.length > 0 && cards[currentIndex] && handleSwipe(cards[currentIndex].id, 'left')}
                                 className="w-16 h-16 rounded-full bg-white border border-[#f2d8e4] text-rose-500 shadow-[0_8px_20px_rgba(244,63,94,0.15)] flex items-center justify-center hover:scale-110 hover:bg-rose-50 transition-all"
                             >
                                 <X size={32} strokeWidth={2.5} />
@@ -349,7 +365,7 @@ const PropagationPanel = () => {
                                 <MessageSquare size={32} fill="currentColor" />
                             </button>
                             <button
-                                onClick={() => cards.length > 0 && cards[currentIndex] && handleSwipe(cards[currentIndex].id)}
+                                onClick={() => cards.length > 0 && cards[currentIndex] && handleSwipe(cards[currentIndex].id, 'right')}
                                 className="w-16 h-16 rounded-full bg-white border border-[#f2d8e4] text-emerald-500 shadow-[0_8px_20px_rgba(16,185,129,0.15)] flex items-center justify-center hover:scale-110 hover:bg-emerald-50 transition-all"
                             >
                                 <Check size={32} strokeWidth={3} />

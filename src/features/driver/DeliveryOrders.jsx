@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Package,
@@ -14,78 +14,9 @@ import {
 } from "lucide-react";
 
 import ChatWidget from "./components/ChatWidget";
-
-// --- MOCK DATA ---
-
-const ACTIVE_ORDERS = [
-  {
-    id: "ORD-101",
-    shop: "Acme Supplies Hub",
-    customer: "Urban Tech Park",
-    address: "Unit 402, IT Park, Hinjewadi",
-    status: "Pickup Pending",
-    price: "₹120",
-    distance: "4.2 km",
-    time: "Due in 20m",
-    items: "Electronics",
-    contactName: "Rajesh Kumar",
-  },
-  {
-    id: "ORD-102",
-    shop: "Fresh Foods Market",
-    customer: "Green Valley Apts",
-    address: "Building C, Flat 401, Baner",
-    status: "In Transit",
-    price: "₹85",
-    distance: "1.5 km",
-    time: "Due in 10m",
-    items: "Groceries",
-    contactName: "Sarah Jenkins",
-  },
-];
-
-const REQUESTS = [
-  {
-    id: "REQ-201",
-    shop: "Tech World",
-    address: "Shop 12, Phoenix Mall, Viman Nagar",
-    offer: 140,
-    distance: 5.5,
-    tags: ["Bulk", "Heavy"],
-    negotiating: false,
-    contactName: "Amit Patel",
-  },
-  {
-    id: "REQ-202",
-    shop: "City Library",
-    address: "Main Campus, Pune University",
-    offer: 60,
-    distance: 2.1,
-    tags: ["Documents"],
-    negotiating: false,
-    contactName: "Priya Sharma",
-  },
-  {
-    id: "REQ-203",
-    shop: "Hardware Depot",
-    address: "Plot 44, Industrial Zone, Chakan",
-    offer: 250,
-    distance: 12.0,
-    tags: ["Heavy", "Urgent"],
-    negotiating: false,
-    contactName: "Ramesh H.",
-  },
-  {
-    id: "REQ-204",
-    shop: "Flower Boutique",
-    address: "Rose Villa, Koregaon Park",
-    offer: 90,
-    distance: 3.2,
-    tags: ["Fragile"],
-    negotiating: false,
-    contactName: "Sunita M.",
-  },
-];
+import { useAuth } from '../../app/providers/AuthContext';
+import { getAssignedDeliveries, markPickedUp, markInTransit } from '../../services/deliveryService';
+import { getOpenOndcRequests, acceptOndcRequest } from '../../services/logisticsService';
 
 // --- Negotiation Panel ---
 const NegotiationPanel = ({ basePrice, onCancel, onSubmit }) => {
@@ -156,11 +87,46 @@ const NegotiationPanel = ({ basePrice, onCancel, onSubmit }) => {
 };
 
 const DeliveryOrders = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("requests");
   const [activeFilter, setActiveFilter] = useState("All");
-  const [requests, setRequests] = useState(REQUESTS);
+  const [activeOrders, setActiveOrders] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatContact, setChatContact] = useState(null);
+
+  // Fetch assigned deliveries + ONDC open requests
+  useEffect(() => {
+    if (!user?.driverProfileId) return;
+    getAssignedDeliveries(user.driverProfileId).then(data => {
+      setActiveOrders(data.map(d => ({
+        id: d.id,
+        orderId: d.order_id,
+        shop: d.orders?.merchant_profiles?.business_name || 'Merchant',
+        customer: d.orders?.shipping_address?.fullName || 'Customer',
+        address: d.orders?.shipping_address?.addressLine || '-',
+        status: d.status === 'pending' ? 'Pickup Pending' : d.status === 'picked_up' ? 'Picked Up' : 'In Transit',
+        price: `₹${Number(d.orders?.total_amount || 0).toFixed(0)}`,
+        distance: '-',
+        time: '-',
+        items: d.orders?.order_items?.map(i => i.product_name).join(', ') || '-',
+        contactName: d.orders?.shipping_address?.fullName || '-',
+      })));
+    }).catch(console.error);
+
+    getOpenOndcRequests().then(data => {
+      setRequests(data.map(r => ({
+        id: r.id,
+        shop: r.orders?.merchant_profiles?.business_name || 'Merchant',
+        address: r.orders?.merchant_profiles?.address || '-',
+        offer: Number(r.cost_slab || 0),
+        distance: 0,
+        tags: ['ONDC'],
+        negotiating: false,
+        contactName: '-',
+      })));
+    }).catch(console.error);
+  }, [user?.driverProfileId]);
 
   const toggleNegotiation = (id) => {
     setRequests((prev) =>
@@ -229,7 +195,7 @@ const DeliveryOrders = () => {
               className={`flex-1 py-3 text-sm font-bold relative z-10 transition-colors ${activeTab === "active" ? "text-[#59112e]" : "text-slate-400"
                 }`}
             >
-              My Tasks ({ACTIVE_ORDERS.length})
+              My Tasks ({activeOrders.length})
             </button>
             <button
               onClick={() => setActiveTab("requests")}
@@ -268,7 +234,7 @@ const DeliveryOrders = () => {
               exit={{ opacity: 0, y: -10 }}
               className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
             >
-              {ACTIVE_ORDERS.map((order) => (
+              {activeOrders.map((order) => (
                 <div
                   key={order.id}
                   className="bg-white p-5 lg:p-6 rounded-2xl border border-slate-100 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] relative overflow-hidden group hover:shadow-[0_8px_24px_-8px_rgba(0,0,0,0.1)] transition-shadow"

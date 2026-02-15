@@ -20,61 +20,16 @@ import {
   X,
   Send
 } from 'lucide-react';
+import { useAuth } from '../../app/providers/AuthContext';
+import { getOrdersByMerchant } from '../../services/orderService';
+import { getDeliveryByOrder } from '../../services/deliveryService';
 
-// --- MOCK DATA ---
-
-const OUTGOING_ORDERS = [
-  { 
-    id: "ORD-7782", 
-    recipient: "Sarah Jenkins", 
-    type: "B2C", 
-    item: "Ergonomic Chair", 
-    status: "Out for Delivery", 
-    progress: 75,
-    eta: "15 mins",
-    driver: { name: "Ramesh K.", vehicle: "Bike", phone: "+91 98765 43210", rating: 4.8 },
-    timeline: [
-      { time: "10:00 AM", event: "Order Placed", done: true },
-      { time: "11:30 AM", event: "Picked up by Driver", done: true },
-      { time: "12:15 PM", event: "In Transit", done: true },
-      { time: "12:45 PM", event: "Out for Delivery", done: true },
-      { time: "--", event: "Delivered", done: false },
-    ]
-  },
-  { 
-    id: "B2B-9921", 
-    recipient: "Urban Furnishings", 
-    type: "B2B", 
-    item: "500x Teak Planks", 
-    status: "In Transit", 
-    progress: 45,
-    eta: "4 Hours",
-    driver: { name: "Express Logistics", vehicle: "Eicher 14ft", phone: "+91 99887 77665", rating: 4.5 },
-    timeline: [
-      { time: "09:00 AM", event: "Shipment Created", done: true },
-      { time: "10:30 AM", event: "Left Warehouse", done: true },
-      { time: "--", event: "Arriving at Hub", done: false },
-    ]
-  }
-];
-
-const INCOMING_ORDERS = [
-  { 
-    id: "STK-4452", 
-    supplier: "Global Raw Materials", 
-    type: "Restock", 
-    item: "Aluminum Sheets", 
-    status: "Arriving", 
-    progress: 90,
-    eta: "20 mins",
-    driver: { name: "Vikram Singh", vehicle: "Tata Ace", phone: "+91 88776 65544", rating: 4.9 },
-    timeline: [
-      { time: "Yesterday", event: "Propagation Accepted", done: true },
-      { time: "08:00 AM", event: "Dispatched", done: true },
-      { time: "Now", event: "Near Location", done: true },
-    ]
-  }
-];
+const STATUS_PROGRESS = {
+  pending: 10, confirmed: 25, packed: 50, out_for_delivery: 75, delivered: 100, cancelled: 0,
+};
+const STATUS_LABEL = {
+  pending: 'Pending', confirmed: 'Confirmed', packed: 'Packed', out_for_delivery: 'Out for Delivery', delivered: 'Delivered', cancelled: 'Cancelled',
+};
 
 // --- COMPONENTS ---
 
@@ -208,18 +163,42 @@ const ChatOverlay = ({ target, onClose }) => {
 };
 
 const TrackingPanel = () => {
-  const [activeTab, setActiveTab] = useState('sent'); // 'sent' | 'received'
-  const [selectedOrder, setSelectedOrder] = useState(OUTGOING_ORDERS[0]);
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('sent');
+  const [outgoingOrders, setOutgoingOrders] = useState([]);
+  const [incomingOrders, setIncomingOrders] = useState([]);
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [showChat, setShowChat] = useState(false);
 
-  // Switch lists based on tab
-  const activeList = activeTab === 'sent' ? OUTGOING_ORDERS : INCOMING_ORDERS;
-
-  // Auto-select first item when switching tabs
+  // Fetch orders
   useEffect(() => {
-      setSelectedOrder(activeList[0]);
+    if (!user?.merchantProfileId) return;
+    getOrdersByMerchant(user.merchantProfileId).then(data => {
+      const mapped = data.filter(o => o.status !== 'cancelled').map(o => ({
+        id: o.id.slice(0, 8).toUpperCase(),
+        fullId: o.id,
+        recipient: o.profiles?.full_name || o.type === 'b2b' ? 'B2B Partner' : 'Customer',
+        type: o.type === 'b2b' ? 'B2B' : 'B2C',
+        item: o.order_items?.[0]?.product_name || 'Order',
+        status: STATUS_LABEL[o.status] || o.status,
+        progress: STATUS_PROGRESS[o.status] || 0,
+        eta: '-',
+        driver: { name: '-', vehicle: '-', phone: '-', rating: 0 },
+        timeline: [
+          { time: new Date(o.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), event: 'Order Placed', done: true },
+        ],
+      }));
+      setOutgoingOrders(mapped);
+      if (mapped.length > 0 && !selectedOrder) setSelectedOrder(mapped[0]);
+    }).catch(console.error);
+  }, [user?.merchantProfileId]);
+
+  const activeList = activeTab === 'sent' ? outgoingOrders : incomingOrders;
+
+  useEffect(() => {
+      setSelectedOrder(activeList[0] || null);
       setShowChat(false);
-  }, [activeTab]);
+  }, [activeTab, activeList.length]);
 
   return (
     // FIX: Added 'pt-20' to push content below the fixed Navbar

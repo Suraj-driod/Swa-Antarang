@@ -134,11 +134,30 @@ const DoodleBackground = () => {
 };
 
 const AuthScreen = () => {
-  const { login } = useAuth();
+  const { user, loading, login, signUp } = useAuth();
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
-  const [userType, setUserType] = useState('merchant'); // 'merchant' | 'delivery' | 'customer'
+  const [userType, setUserType] = useState('merchant');
   const [aadhaarFile, setAadhaarFile] = useState(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [nameField, setNameField] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // Redirect target per role
+  const dashboardMap = {
+    merchant: '/merchant/Dashboard',
+    driver: '/driver/DashboardDelivery',
+    customer: '/customer/CustomerApp',
+  };
+
+  // If already authenticated, redirect immediately
+  React.useEffect(() => {
+    if (!loading && user) {
+      navigate(dashboardMap[user.role] || '/merchant/Dashboard', { replace: true });
+    }
+  }, [loading, user]);
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -156,18 +175,30 @@ const AuthScreen = () => {
   // Map UI userType → auth role
   const roleMap = { merchant: 'merchant', delivery: 'driver', customer: 'customer' };
 
-  // Redirect target per role
-  const dashboardMap = {
-    merchant: '/merchant/Dashboard',
-    driver: '/driver/DashboardDelivery',
-    customer: '/customer/CustomerApp',
-  };
-
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setSubmitting(true);
     const role = roleMap[userType];
-    login({ id: crypto.randomUUID(), role });
-    navigate(dashboardMap[role], { replace: true });
+
+    try {
+      if (isLogin) {
+        await login(email, password);
+      } else {
+        const metadata = {
+          role,
+          full_name: nameField,
+          ...(userType === 'merchant' && { business_name: nameField }),
+          ...(userType === 'delivery' && { vehicle_type: '' }),
+        };
+        await signUp(email, password, metadata);
+      }
+      navigate(dashboardMap[role], { replace: true });
+    } catch (err) {
+      setError(err.message || 'Authentication failed');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // Content configuration based on Role
@@ -315,6 +346,8 @@ const AuthScreen = () => {
                     </div>
                     <input
                       type="text"
+                      value={nameField}
+                      onChange={(e) => setNameField(e.target.value)}
                       placeholder={userType === 'merchant' ? 'Acme Co.' : 'John Doe'}
                       className="w-full bg-gray-50/50 border border-gray-200 text-main font-bold rounded-xl py-4 pl-12 pr-4 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all placeholder:font-medium"
                     />
@@ -326,7 +359,7 @@ const AuthScreen = () => {
                 <label className="text-xs font-bold uppercase tracking-wider text-primary/60 ml-1">Email</label>
                 <div className="relative group">
                   <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors" size={20} />
-                  <input type="email" placeholder="name@work.com" className="w-full bg-gray-50/50 border border-gray-200 text-main font-bold rounded-xl py-4 pl-12 pr-4 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all placeholder:font-medium" />
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@work.com" className="w-full bg-gray-50/50 border border-gray-200 text-main font-bold rounded-xl py-4 pl-12 pr-4 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all placeholder:font-medium" />
                 </div>
               </motion.div>
 
@@ -357,20 +390,34 @@ const AuthScreen = () => {
                 </div>
                 <div className="relative group">
                   <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors" size={20} />
-                  <input type="password" placeholder="••••••••" className="w-full bg-gray-50/50 border border-gray-200 text-main font-bold rounded-xl py-4 pl-12 pr-4 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all placeholder:font-medium" />
+                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="w-full bg-gray-50/50 border border-gray-200 text-main font-bold rounded-xl py-4 pl-12 pr-4 outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/5 transition-all placeholder:font-medium" />
                 </div>
               </motion.div>
             </AnimatePresence>
 
+            {/* Error */}
+            {error && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-600 text-xs font-bold rounded-xl px-4 py-3 text-center">
+                {error}
+              </div>
+            )}
+
             {/* Action Button */}
             <motion.button
               type="submit"
+              disabled={submitting}
               whileHover={{ scale: 1.01, translateY: -2 }}
               whileTap={{ scale: 0.98 }}
-              className={`w-full ${activeConfig.color} text-white font-bold text-lg rounded-2xl py-4 mt-4 shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center justify-center gap-2 group`}
+              className={`w-full ${activeConfig.color} text-white font-bold text-lg rounded-2xl py-4 mt-4 shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center justify-center gap-2 group disabled:opacity-60`}
             >
-              <span>{isLogin ? 'Sign In' : 'Continue'}</span>
-              <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
+              {submitting ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <>
+                  <span>{isLogin ? 'Sign In' : 'Continue'}</span>
+                  <ArrowRight className="group-hover:translate-x-1 transition-transform" size={20} />
+                </>
+              )}
             </motion.button>
 
           </form>

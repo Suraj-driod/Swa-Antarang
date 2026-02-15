@@ -41,7 +41,14 @@ class ErrorBoundary extends React.Component {
     };
 
     handleReload = () => {
+        this.setState({ hasError: false, error: null, errorInfo: null });
         window.location.reload();
+    };
+
+    handleGoHome = () => {
+        // Reset error state and navigate without full page reload
+        this.setState({ hasError: false, error: null, errorInfo: null });
+        window.location.href = '/';
     };
 
     render() {
@@ -91,13 +98,13 @@ class ErrorBoundary extends React.Component {
                                     <RefreshCw size={18} />
                                     Reload Dashboard
                                 </button>
-                                <a
-                                    href="/"
+                                <button
+                                    onClick={this.handleGoHome}
                                     className="flex items-center justify-center gap-2 px-6 py-3 bg-white border border-[#f2d8e4] text-[#59112e] rounded-xl font-bold text-sm hover:bg-[#fdf2f6] hover:border-[#59112e]/30 transition-all active:scale-95"
                                 >
                                     <Home size={18} />
                                     Go Home
-                                </a>
+                                </button>
                             </div>
 
                             {/* Developer Details Toggle */}

@@ -15,22 +15,15 @@ import {
   User,
   RotateCw
 } from 'lucide-react';
+import { useAuth } from '../../app/providers/AuthContext';
+import { getRawInventory, getListedInventory } from '../../services/inventoryService';
 
-// --- MOCK DATA ---
-const RAW_ITEMS = [
-  { id: 1, name: "Teak Wood Planks", sku: "RW-001", stock: 450, unit: "pcs", status: "In Stock", supplier: "Global Timber Co." },
-  { id: 2, name: "Industrial Steel Rods", sku: "MT-882", stock: 24, unit: "tons", status: "Low Stock", supplier: "MetalWorks Inc." },
-  { id: 3, name: "Cotton Fabric Rolls", sku: "TX-104", stock: 120, unit: "rolls", status: "In Stock", supplier: "FabriTex" },
-  { id: 4, name: "Polyurethane Foam", sku: "CH-552", stock: 0, unit: "sheets", status: "Out of Stock", supplier: "ChemSynth" },
-  { id: 5, name: "Aluminum Fasteners", sku: "HD-992", stock: 5000, unit: "box", status: "In Stock", supplier: "FastenUp" },
-];
-
-const LISTED_ITEMS = [
-  { id: 1, name: "Ergonomic Office Chair", sku: "PRD-101", price: "$120.00", stock: 15, platform: "Amazon", views: "1.2k" },
-  { id: 2, name: "Minimalist Study Table", sku: "PRD-205", price: "$240.50", stock: 8, platform: "Shopify", views: "850" },
-  { id: 3, name: "Velvet Sofa Set", sku: "PRD-330", price: "$899.00", stock: 2, platform: "Wayfair", views: "3.4k" },
-  { id: 4, name: "Wooden Dining Table", sku: "PRD-412", price: "$550.00", stock: 12, platform: "In-Store", views: "N/A" },
-];
+// Status map from DB enum to display
+const STATUS_MAP = {
+  in_stock: "In Stock",
+  low_stock: "Low Stock",
+  out_of_stock: "Out of Stock",
+};
 
 // --- COMPONENTS ---
 
@@ -76,7 +69,11 @@ const ChatMessage = ({ msg }) => (
 );
 
 const InventoryDashboard = () => {
-  const [activeTab, setActiveTab] = useState('raw'); // 'raw' | 'listed'
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState('raw');
+  const [rawItems, setRawItems] = useState([]);
+  const [listedItems, setListedItems] = useState([]);
+  const [loadingData, setLoadingData] = useState(true);
   const [chatMessages, setChatMessages] = useState([
     { id: 1, sender: 'ai', content: "Hi there! 👋 I'm your Inventory Assistant. You can upload an Excel sheet or paste a WhatsApp message to update stock instantly." }
   ]);
@@ -88,6 +85,28 @@ const InventoryDashboard = () => {
   };
 
   useEffect(scrollToBottom, [chatMessages]);
+
+  // Fetch inventory data
+  useEffect(() => {
+    if (!user?.merchantProfileId) return;
+    setLoadingData(true);
+    Promise.all([
+      getRawInventory(user.merchantProfileId),
+      getListedInventory(user.merchantProfileId),
+    ]).then(([raw, listed]) => {
+      setRawItems(raw.map(r => ({
+        ...r,
+        supplier: r.supplier_name,
+        status: STATUS_MAP[r.status] || r.status,
+      })));
+      setListedItems(listed.map(l => ({
+        ...l,
+        price: `$${Number(l.price).toFixed(2)}`,
+        views: 'N/A',
+      })));
+    }).catch(console.error)
+      .finally(() => setLoadingData(false));
+  }, [user?.merchantProfileId]);
 
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
@@ -206,7 +225,7 @@ const InventoryDashboard = () => {
                         <div className="col-span-2 text-right">Actions</div>
                     </div>
                     
-                    {RAW_ITEMS.map((item) => (
+                    {rawItems.map((item) => (
                         <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center bg-white p-4 rounded-2xl border border-[#f2d8e4]/50 shadow-sm hover:shadow-md hover:border-[#59112e]/20 transition-all group">
                             <div className="col-span-4 flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-lg bg-[#fdf2f6] text-[#59112e] flex items-center justify-center font-bold shrink-0">
@@ -252,7 +271,7 @@ const InventoryDashboard = () => {
                     exit={{ opacity: 0, y: -10 }}
                     className="grid grid-cols-1 md:grid-cols-2 gap-4"
                 >
-                    {LISTED_ITEMS.map((item) => (
+                    {listedItems.map((item) => (
                           <div key={item.id} className="bg-white p-5 rounded-2xl border border-[#f2d8e4]/50 shadow-sm hover:border-[#59112e]/20 hover:shadow-lg hover:shadow-[#59112e]/5 transition-all group relative overflow-hidden">
                              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#59112e]/5 to-transparent rounded-bl-full -mr-10 -mt-10"></div>
                              

@@ -34,66 +34,14 @@ import {
   IndianRupee,
 } from "lucide-react";
 import RouteMap from "../../components/map/TradeMap";
+import { useAuth } from '../../app/providers/AuthContext';
+import { browseListedInventory } from '../../services/inventoryService';
+import { createOrder, getMyOrders } from '../../services/orderService';
 
-// --- MOCK DATA ---
-
-const PRODUCTS = [
-  {
-    id: 1,
-    name: "Teak Wood Planks",
-    price: 4200,
-    category: "Raw Material",
-    image: "🪵",
-    stock: 12,
-    unit: "bundle",
-  },
-  {
-    id: 2,
-    name: "Industrial Fasteners",
-    price: 850,
-    category: "Hardware",
-    image: "🔩",
-    stock: 450,
-    unit: "box",
-  },
-  {
-    id: 3,
-    name: "Cotton Fabric Roll",
-    price: 1200,
-    category: "Textile",
-    image: "🧵",
-    stock: 5,
-    unit: "roll",
-    lowStock: true,
-  },
-  {
-    id: 4,
-    name: "Varnish Grade-A",
-    price: 350,
-    category: "Chemicals",
-    image: "🛢️",
-    stock: 20,
-    unit: "can",
-  },
-  {
-    id: 5,
-    name: "Heavy Duty Glue",
-    price: 150,
-    category: "Adhesives",
-    image: "🧴",
-    stock: 50,
-    unit: "bottle",
-  },
-  {
-    id: 6,
-    name: "Safety Gloves",
-    price: 450,
-    category: "Safety",
-    image: "🧤",
-    stock: 100,
-    unit: "pair",
-  },
-];
+const EMOJI_MAP = {
+  'Raw Material': '🪵', 'Hardware': '🔩', 'Textile': '🧵',
+  'Chemicals': '🛢️', 'Adhesives': '🧴', 'Safety': '🧤',
+};
 
 const ORDER_TIMELINE = [
   { status: "Order Placed", time: "10:30 AM", completed: true },
@@ -1162,20 +1110,81 @@ const OrdersTrackingPage = ({ orders, onBackToShop }) => {
 };
 
 const CustomerApp = () => {
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const currentView = searchParams.get("view"); // null | 'cart' | 'tracking'
+  const currentView = searchParams.get("view");
 
-  const [activeTab, setActiveTab] = useState("home"); // Mobile Tab State: 'home', 'cart', 'tracking'
-  const [desktopView, setDesktopView] = useState("cart"); // Desktop Right Panel: 'cart', 'tracking'
+  const [activeTab, setActiveTab] = useState("home");
+  const [desktopView, setDesktopView] = useState("cart");
+  const [products, setProducts] = useState([]);
   const [cart, setCart] = useState([]);
   const [orders, setOrders] = useState([]);
   const [showQR, setShowQR] = useState(false);
   const [orderComplete, setOrderComplete] = useState(false);
 
-  const handleOrderPlaced = (orderData) => {
-    setOrders((prev) => [...prev, orderData]);
-    setCart([]); // Clear cart after order is placed
+  // Fetch listed products
+  useEffect(() => {
+    browseListedInventory().then(data => {
+      setProducts(data.map(item => ({
+        id: item.id,
+        inventory_listed_id: item.id,
+        merchant_id: item.merchant_id,
+        name: item.name,
+        price: Number(item.price),
+        category: item.category || 'General',
+        image: EMOJI_MAP[item.category] || '📦',
+        stock: item.stock,
+        unit: item.unit || 'pcs',
+        lowStock: item.stock < 10,
+        merchantName: item.merchant_profiles?.business_name || '',
+      })));
+    }).catch(console.error);
+  }, []);
+
+  // Fetch past orders
+  useEffect(() => {
+    if (!user?.id) return;
+    getMyOrders(user.id).then(data => {
+      setOrders(data.map(o => ({
+        id: o.id,
+        orderNumber: o.id.slice(0, 8).toUpperCase(),
+        qrCode: o.qr_code,
+        status: o.status,
+        total: Number(o.total_amount),
+        items: o.order_items || [],
+        merchantName: o.merchant_profiles?.business_name || '',
+        createdAt: o.created_at,
+      })));
+    }).catch(console.error);
+  }, [user?.id]);
+
+  const handleOrderPlaced = async (orderData) => {
+    if (!user?.id || cart.length === 0) return;
+    try {
+      // Group cart items by merchant
+      const merchantId = cart[0].merchant_id;
+      const total = cart.reduce((a, i) => a + i.price * i.quantity, 0);
+      const order = await createOrder(
+        merchantId,
+        user.id,
+        cart.map(i => ({ inventory_listed_id: i.inventory_listed_id, name: i.name, quantity: i.quantity, price: i.price })),
+        orderData?.address || {},
+        total,
+      );
+      setOrders(prev => [...prev, {
+        id: order.id,
+        orderNumber: order.id.slice(0, 8).toUpperCase(),
+        qrCode: order.qr_code,
+        status: order.status,
+        total,
+        items: cart,
+        createdAt: order.created_at,
+      }]);
+      setCart([]);
+    } catch (err) {
+      console.error('Order failed:', err);
+    }
   };
 
   // Responsive: If on mobile and switching tabs, sync logic
@@ -1316,14 +1325,14 @@ const CustomerApp = () => {
                 <h3 className="text-xl font-bold text-slate-800">
                   Featured Products
                 </h3>
-                <p className="text-xs text-slate-400 font-medium">{PRODUCTS.length} items available</p>
+                <p className="text-xs text-slate-400 font-medium">{products.length} items available</p>
               </div>
             </div>
           </div>
 
           {/* Product Grid */}
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5 md:gap-6 pb-24 md:pb-0">
-            {PRODUCTS.map((p) => (
+            {products.map((p) => (
               <ProductCard key={p.id} product={p} onAdd={addToCart} />
             ))}
           </div>
