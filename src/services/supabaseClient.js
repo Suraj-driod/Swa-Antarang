@@ -11,7 +11,7 @@ export const supabase = createClient(
             persistSession: true,
             storageKey: STORAGE_KEY,
             autoRefreshToken: true,
-            detectSessionInUrl: true,
+            detectSessionInUrl: false, // Disabled: saves 200-500ms on re-logins (no magic links/OAuth)
         },
     }
 );
