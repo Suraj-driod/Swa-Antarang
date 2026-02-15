@@ -38,6 +38,7 @@ import RouteMap from "../../components/map/TradeMap";
 import { useAuth } from '../../app/providers/AuthContext';
 import { browseListedInventory } from '../../services/inventoryService';
 import { createOrder, getMyOrders } from '../../services/orderService';
+import { getProductImageUrl } from '../../services/storageService';
 
 const EMOJI_MAP = {
   'Raw Material': '🪵', 'Hardware': '🔩', 'Textile': '🧵',
@@ -53,6 +54,15 @@ const ORDER_TIMELINE = [
 
 // --- COMPONENTS ---
 
+// Helper: renders a real <img> if imageUrl exists, else falls back to emoji
+const ProductImage = ({ imageUrl, emoji, className = "", imgClassName = "" }) => {
+  const [imgError, setImgError] = React.useState(false);
+  if (imageUrl && !imgError) {
+    return <img src={imageUrl} alt="" onError={() => setImgError(true)} className={`w-full h-full object-cover ${imgClassName}`} />;
+  }
+  return <span className={className}>{emoji}</span>;
+};
+
 // 1. Product Card
 const ProductCard = ({ product, onAdd }) => (
   <motion.div
@@ -63,15 +73,19 @@ const ProductCard = ({ product, onAdd }) => (
     <div className="h-44 bg-gradient-to-br from-[#fdf2f6] via-[#f8e8ef] to-[#f2d8e4] flex items-center justify-center text-6xl relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-t from-white/30 to-transparent"></div>
       <div className="absolute inset-0 bg-[#59112e]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-      <span className="relative z-10 group-hover:scale-110 transition-transform duration-500 drop-shadow-sm">
-        {product.image}
-      </span>
+      {product.imageUrl ? (
+        <ProductImage imageUrl={product.imageUrl} emoji={product.image} imgClassName="absolute inset-0 z-10 group-hover:scale-110 transition-transform duration-500" />
+      ) : (
+        <span className="relative z-10 group-hover:scale-110 transition-transform duration-500 drop-shadow-sm">
+          {product.image}
+        </span>
+      )}
       {/* Category Pill */}
       <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-[10px] text-[#59112e] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border border-[#f2d8e4] shadow-sm z-10">
         {product.category}
       </span>
       {/* Hover Add Overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#59112e]/80 via-[#59112e]/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-end justify-center pb-4 z-10">
+      <div className="absolute inset-0 bg-gradient-to-t from-[#59112e]/80 via-[#59112e]/20 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-end justify-center pb-4 z-20">
         <span className="text-white text-xs font-bold bg-white/20 backdrop-blur-sm px-4 py-1.5 rounded-full border border-white/20">
           Quick Add +
         </span>
@@ -251,8 +265,8 @@ const SidePanel = ({
                     animate={{ opacity: 1, x: 0 }}
                     className="flex gap-3 items-center bg-slate-50 p-3 rounded-xl hover:bg-[#fdf2f6] transition-colors group"
                   >
-                    <div className="w-12 h-12 bg-gradient-to-br from-[#fdf2f6] to-[#f2d8e4] rounded-xl flex items-center justify-center text-xl shadow-sm group-hover:scale-105 transition-transform">
-                      {item.image}
+                    <div className="w-12 h-12 bg-gradient-to-br from-[#fdf2f6] to-[#f2d8e4] rounded-xl flex items-center justify-center text-xl shadow-sm group-hover:scale-105 transition-transform overflow-hidden">
+                      <ProductImage imageUrl={item.imageUrl} emoji={item.image} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h4 className="text-sm font-bold text-slate-700 truncate">
@@ -514,7 +528,7 @@ const MyCartPage = ({
                       transition={{ delay: idx * 0.05 }}
                       className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex gap-5 items-center hover:shadow-md hover:border-[#f2d8e4] transition-all group"
                     >
-                      <div className="w-20 h-20 bg-gradient-to-br from-[#fdf2f6] to-[#f8e8ef] rounded-2xl flex items-center justify-center text-4xl shrink-0 group-hover:scale-105 transition-transform shadow-sm">{item.image}</div>
+                      <div className="w-20 h-20 bg-gradient-to-br from-[#fdf2f6] to-[#f8e8ef] rounded-2xl flex items-center justify-center text-4xl shrink-0 group-hover:scale-105 transition-transform shadow-sm overflow-hidden"><ProductImage imageUrl={item.imageUrl} emoji={item.image} /></div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[11px] text-[#59112e]/60 font-bold uppercase tracking-wider mb-0.5">{item.category}</p>
                         <h4 className="font-bold text-slate-800 text-base truncate mb-1">{item.name}</h4>
@@ -892,7 +906,7 @@ const OrdersTrackingPage = ({ orders, onBackToShop }) => {
                       transition={{ delay: idx * 0.05 }}
                       className="flex gap-4 items-center p-4 bg-slate-50 rounded-xl hover:bg-[#fdf2f6] transition-colors"
                     >
-                      <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-2xl shrink-0 shadow-sm">{item.image}</div>
+                      <div className="w-14 h-14 bg-white rounded-xl flex items-center justify-center text-2xl shrink-0 shadow-sm overflow-hidden"><ProductImage imageUrl={item.imageUrl} emoji={item.image} /></div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[11px] text-[#59112e]/60 font-bold uppercase tracking-wider mb-0.5">{item.category}</p>
                         <h4 className="font-bold text-slate-800 text-sm truncate">{item.name}</h4>
@@ -1093,7 +1107,7 @@ const OrdersTrackingPage = ({ orders, onBackToShop }) => {
                 <div className="px-6 pb-4">
                   <div className="flex items-center gap-2 overflow-hidden">
                     {order.items.slice(0, 5).map((item) => (
-                      <div key={item.id} className="w-10 h-10 bg-[#fdf2f6] rounded-lg flex items-center justify-center text-lg shrink-0 border border-[#f2d8e4]">{item.image}</div>
+                      <div key={item.id} className="w-10 h-10 bg-[#fdf2f6] rounded-lg flex items-center justify-center text-lg shrink-0 border border-[#f2d8e4] overflow-hidden"><ProductImage imageUrl={item.imageUrl} emoji={item.image} /></div>
                     ))}
                     {order.items.length > 5 && (
                       <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">+{order.items.length - 5}</div>
@@ -1129,7 +1143,7 @@ const CustomerApp = () => {
   // Fetch listed products
   useEffect(() => {
     browseListedInventory().then(data => {
-      setProducts(data.map(item => ({
+      setProducts((data || []).map(item => ({
         id: item.id,
         inventory_listed_id: item.id,
         merchant_id: item.merchant_id,
@@ -1137,12 +1151,16 @@ const CustomerApp = () => {
         price: Number(item.price),
         category: item.category || 'General',
         image: EMOJI_MAP[item.category] || '📦',
+        imageUrl: getProductImageUrl(item.image_url),
         stock: item.stock,
         unit: item.unit || 'pcs',
         lowStock: item.stock < 10,
         merchantName: item.merchant_profiles?.business_name || '',
       })));
-    }).catch(console.error);
+    }).catch(err => {
+      console.error('Failed to load products:', err);
+      setProducts([]);
+    });
   }, []);
 
   // Fetch past orders
@@ -1334,11 +1352,21 @@ const CustomerApp = () => {
           </div>
 
           {/* Product Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5 md:gap-6 pb-24 md:pb-0">
-            {products.map((p) => (
-              <ProductCard key={p.id} product={p} onAdd={addToCart} />
-            ))}
-          </div>
+          {products.length === 0 ? (
+            <div className="text-center py-24 bg-white rounded-3xl border border-slate-100 shadow-sm">
+              <div className="w-24 h-24 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-[#fdf2f6] to-[#f2d8e4] flex items-center justify-center">
+                <Package size={40} className="text-[#59112e]/40" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-600 mb-2">No products available</h3>
+              <p className="text-sm text-slate-400 max-w-xs mx-auto">There are no listed products at the moment. Please check back later!</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-5 md:gap-6 pb-24 md:pb-0">
+              {products.map((p) => (
+                <ProductCard key={p.id} product={p} onAdd={addToCart} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* RIGHT PANEL (Desktop: Fixed / Mobile: Full Screen Overlay for Cart/Tracking) */}

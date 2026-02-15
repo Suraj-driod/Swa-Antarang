@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../app/providers/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp,
@@ -12,7 +13,7 @@ import {
   Lightbulb,
   ArrowUpRight,
   Calendar,
-  DollarSign,
+  IndianRupee,
   ShoppingBag,
   BarChart3,
   ChevronLeft,
@@ -55,9 +56,9 @@ const KPI_STATS = [
   {
     id: 4,
     label: "Today's Revenue",
-    value: "$2.4k",
+    value: "₹2.4k",
     sub: "+12% from yesterday",
-    icon: DollarSign,
+    icon: IndianRupee,
     color: "text-[#59112e]",
     bg: "bg-[#fdf2f6]",
     border: "border-[#f2d8e4]"
@@ -91,97 +92,96 @@ const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "Ju
 
 // 1. Custom Calendar Widget
 const CalendarWidget = ({ selectedDate, onSelect, onClose }) => {
-    const [currentMonth, setCurrentMonth] = useState(selectedDate.getMonth());
-    const [currentYear, setCurrentYear] = useState(selectedDate.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(selectedDate.getMonth());
+  const [currentYear, setCurrentYear] = useState(selectedDate.getFullYear());
 
-    const daysInMonth = getDaysInMonth(currentYear, currentMonth);
-    const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
-    
-    const handlePrev = () => {
-        if (currentMonth === 0) {
-            setCurrentMonth(11);
-            setCurrentYear(prev => prev - 1);
-        } else {
-            setCurrentMonth(prev => prev - 1);
-        }
-    };
+  const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+  const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
 
-    const handleNext = () => {
-        if (currentMonth === 11) {
-            setCurrentMonth(0);
-            setCurrentYear(prev => prev + 1);
-        } else {
-            setCurrentMonth(prev => prev + 1);
-        }
-    };
+  const handlePrev = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear(prev => prev - 1);
+    } else {
+      setCurrentMonth(prev => prev - 1);
+    }
+  };
 
-    const handleDayClick = (day) => {
-        const newDate = new Date(currentYear, currentMonth, day);
-        onSelect(newDate);
-    };
+  const handleNext = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear(prev => prev + 1);
+    } else {
+      setCurrentMonth(prev => prev + 1);
+    }
+  };
 
-    const isToday = (day) => {
-        return selectedDate.getDate() === day && selectedDate.getMonth() === currentMonth && selectedDate.getFullYear() === currentYear;
-    };
+  const handleDayClick = (day) => {
+    const newDate = new Date(currentYear, currentMonth, day);
+    onSelect(newDate);
+  };
 
-    return (
-        <motion.div 
-            initial={{ opacity: 0, y: 10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute top-12 right-0 bg-white p-4 rounded-[24px] shadow-xl border border-[#f2d8e4] z-50 w-72"
-        >
-            <div className="flex justify-between items-center mb-4">
-                <button onClick={handlePrev} className="p-1 hover:bg-[#fdf2f6] rounded-full text-slate-500 hover:text-[#59112e] transition-colors"><ChevronLeft size={18} /></button>
-                <h4 className="font-bold text-[#2d0b16]">{MONTH_NAMES[currentMonth]} {currentYear}</h4>
-                <button onClick={handleNext} className="p-1 hover:bg-[#fdf2f6] rounded-full text-slate-500 hover:text-[#59112e] transition-colors"><ChevronRight size={18} /></button>
-            </div>
+  const isToday = (day) => {
+    return selectedDate.getDate() === day && selectedDate.getMonth() === currentMonth && selectedDate.getFullYear() === currentYear;
+  };
 
-            <div className="grid grid-cols-7 gap-1 text-center mb-2">
-                {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => (
-                    <span key={d} className="text-[10px] font-bold text-slate-400">{d}</span>
-                ))}
-            </div>
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+      className="absolute top-12 right-0 bg-white p-4 rounded-[24px] shadow-xl border border-[#f2d8e4] z-50 w-72"
+    >
+      <div className="flex justify-between items-center mb-4">
+        <button onClick={handlePrev} className="p-1 hover:bg-[#fdf2f6] rounded-full text-slate-500 hover:text-[#59112e] transition-colors"><ChevronLeft size={18} /></button>
+        <h4 className="font-bold text-[#2d0b16]">{MONTH_NAMES[currentMonth]} {currentYear}</h4>
+        <button onClick={handleNext} className="p-1 hover:bg-[#fdf2f6] rounded-full text-slate-500 hover:text-[#59112e] transition-colors"><ChevronRight size={18} /></button>
+      </div>
 
-            <div className="grid grid-cols-7 gap-1">
-                {/* Empty slots for start of month */}
-                {Array.from({ length: firstDay }).map((_, i) => (
-                    <div key={`empty-${i}`} />
-                ))}
-                
-                {/* Days */}
-                {Array.from({ length: daysInMonth }).map((_, i) => {
-                    const day = i + 1;
-                    const selected = isToday(day);
-                    return (
-                        <button
-                            key={day}
-                            onClick={() => handleDayClick(day)}
-                            className={`h-8 w-8 rounded-full text-xs font-medium flex items-center justify-center transition-all ${
-                                selected 
-                                ? 'bg-[#59112e] text-white shadow-md' 
-                                : 'text-slate-600 hover:bg-[#fdf2f6] hover:text-[#59112e]'
-                            }`}
-                        >
-                            {day}
-                        </button>
-                    );
-                })}
-            </div>
-            
-            <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between">
-                <button onClick={() => { onSelect(new Date()); }} className="text-xs font-bold text-[#59112e] hover:underline">Today</button>
-                <button onClick={onClose} className="text-xs font-medium text-slate-400 hover:text-slate-600">Close</button>
-            </div>
-        </motion.div>
-    );
+      <div className="grid grid-cols-7 gap-1 text-center mb-2">
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => (
+          <span key={d} className="text-[10px] font-bold text-slate-400">{d}</span>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1">
+        {/* Empty slots for start of month */}
+        {Array.from({ length: firstDay }).map((_, i) => (
+          <div key={`empty-${i}`} />
+        ))}
+
+        {/* Days */}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1;
+          const selected = isToday(day);
+          return (
+            <button
+              key={day}
+              onClick={() => handleDayClick(day)}
+              className={`h-8 w-8 rounded-full text-xs font-medium flex items-center justify-center transition-all ${selected
+                ? 'bg-[#59112e] text-white shadow-md'
+                : 'text-slate-600 hover:bg-[#fdf2f6] hover:text-[#59112e]'
+                }`}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between">
+        <button onClick={() => { onSelect(new Date()); }} className="text-xs font-bold text-[#59112e] hover:underline">Today</button>
+        <button onClick={onClose} className="text-xs font-medium text-slate-400 hover:text-slate-600">Close</button>
+      </div>
+    </motion.div>
+  );
 };
 
 // 2. Enhanced Chart
 const SalesChart = ({ range }) => {
-  const pathData = range === 'Weekly' 
-    ? "M0,180 Q100,80 200,150 T400,90 T600,120" 
-    : "M0,200 C150,150 250,50 400,80 S600,40 600,40"; 
+  const pathData = range === 'Weekly'
+    ? "M0,180 Q100,80 200,150 T400,90 T600,120"
+    : "M0,200 C150,150 250,50 400,80 S600,40 600,40";
 
   return (
     <div className="relative h-56 w-full mt-6">
@@ -190,15 +190,15 @@ const SalesChart = ({ range }) => {
         <div className="w-full h-px bg-slate-100"></div>
         <div className="w-full h-px bg-slate-100"></div>
         <div className="w-full h-px bg-slate-100"></div>
-        <div className="w-full h-px bg-slate-200"></div> 
+        <div className="w-full h-px bg-slate-200"></div>
       </div>
 
-      <motion.svg 
-        className="absolute inset-0 w-full h-full" 
+      <motion.svg
+        className="absolute inset-0 w-full h-full"
         preserveAspectRatio="none"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        key={range} 
+        key={range}
       >
         <defs>
           <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
@@ -206,7 +206,7 @@ const SalesChart = ({ range }) => {
             <stop offset="100%" stopColor="#59112e" stopOpacity="0" />
           </linearGradient>
         </defs>
-        
+
         <motion.path
           d={`${pathData} V224 H0 Z`}
           fill="url(#chartGradient)"
@@ -214,7 +214,7 @@ const SalesChart = ({ range }) => {
           animate={{ d: `${pathData} V224 H0 Z` }}
           transition={{ duration: 0.8, ease: "easeOut" }}
         />
-        
+
         <motion.path
           d={pathData}
           fill="none"
@@ -230,29 +230,29 @@ const SalesChart = ({ range }) => {
 
       {range === 'Weekly' ? (
         <>
-            <div className="absolute top-[40%] left-[20%] group">
-                <div className="w-3 h-3 bg-white border-2 border-[#59112e] rounded-full shadow-sm z-10 relative cursor-pointer hover:scale-125 transition-transform"></div>
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#2d0b16] text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">$1,200</div>
-            </div>
-            <div className="absolute top-[25%] left-[50%] group">
-                <div className="w-3 h-3 bg-white border-2 border-[#59112e] rounded-full shadow-sm z-10 relative cursor-pointer hover:scale-125 transition-transform"></div>
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#2d0b16] text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">$2,450</div>
-            </div>
-            <div className="absolute top-[45%] left-[80%] group">
-                <div className="w-3 h-3 bg-white border-2 border-[#59112e] rounded-full shadow-sm z-10 relative cursor-pointer hover:scale-125 transition-transform"></div>
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#2d0b16] text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">$1,800</div>
-            </div>
+          <div className="absolute top-[40%] left-[20%] group">
+            <div className="w-3 h-3 bg-white border-2 border-[#59112e] rounded-full shadow-sm z-10 relative cursor-pointer hover:scale-125 transition-transform"></div>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#2d0b16] text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">₹1,200</div>
+          </div>
+          <div className="absolute top-[25%] left-[50%] group">
+            <div className="w-3 h-3 bg-white border-2 border-[#59112e] rounded-full shadow-sm z-10 relative cursor-pointer hover:scale-125 transition-transform"></div>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#2d0b16] text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">₹2,450</div>
+          </div>
+          <div className="absolute top-[45%] left-[80%] group">
+            <div className="w-3 h-3 bg-white border-2 border-[#59112e] rounded-full shadow-sm z-10 relative cursor-pointer hover:scale-125 transition-transform"></div>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#2d0b16] text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">₹1,800</div>
+          </div>
         </>
       ) : (
         <>
-            <div className="absolute top-[20%] left-[30%] group">
-                <div className="w-3 h-3 bg-white border-2 border-[#59112e] rounded-full shadow-sm z-10 relative cursor-pointer hover:scale-125 transition-transform"></div>
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#2d0b16] text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">$12,500</div>
-            </div>
-            <div className="absolute top-[10%] left-[70%] group">
-                <div className="w-3 h-3 bg-white border-2 border-[#59112e] rounded-full shadow-sm z-10 relative cursor-pointer hover:scale-125 transition-transform"></div>
-                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#2d0b16] text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">$18,200</div>
-            </div>
+          <div className="absolute top-[20%] left-[30%] group">
+            <div className="w-3 h-3 bg-white border-2 border-[#59112e] rounded-full shadow-sm z-10 relative cursor-pointer hover:scale-125 transition-transform"></div>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#2d0b16] text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">₹12,500</div>
+          </div>
+          <div className="absolute top-[10%] left-[70%] group">
+            <div className="w-3 h-3 bg-white border-2 border-[#59112e] rounded-full shadow-sm z-10 relative cursor-pointer hover:scale-125 transition-transform"></div>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-[#2d0b16] text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">₹18,200</div>
+          </div>
         </>
       )}
     </div>
@@ -260,17 +260,18 @@ const SalesChart = ({ range }) => {
 };
 
 const Dashboard = () => {
+  const { user } = useAuth();
   const [timeRange, setTimeRange] = useState('Weekly'); // 'Weekly' | 'Monthly'
-  const [selectedDate, setSelectedDate] = useState(new Date(2026, 1, 14)); // Mock date Feb 14, 2026
+  const [selectedDate, setSelectedDate] = useState(new Date()); // Dynamic current date
   const [showCalendar, setShowCalendar] = useState(false);
 
   const formatDate = (date) => {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const handleDateSelect = (date) => {
-      setSelectedDate(date);
-      setShowCalendar(false);
+    setSelectedDate(date);
+    setShowCalendar(false);
   };
 
   return (
@@ -281,31 +282,31 @@ const Dashboard = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Today's Overview</h2>
-          <p className="text-slate-500 mt-1 font-medium">Key performance indicators for <span className="text-[#59112e] font-bold">Acme Supplies</span></p>
+          <p className="text-slate-500 mt-1 font-medium">Key performance indicators for <span className="text-[#59112e] font-bold">{user?.fullName || 'Your Store'}</span></p>
         </div>
-        
+
         {/* Date Picker Button Container */}
         <div className="relative z-50">
-            <button 
-                onClick={(e) => { e.stopPropagation(); setShowCalendar(!showCalendar); }}
-                className="flex items-center gap-2 text-sm font-bold text-[#59112e] bg-white px-5 py-2.5 rounded-xl border border-[#f2d8e4] shadow-sm hover:shadow-md transition-all active:scale-95"
-            >
-                <Calendar size={18} />
-                <span>{formatDate(selectedDate)}</span>
-            </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowCalendar(!showCalendar); }}
+            className="flex items-center gap-2 text-sm font-bold text-[#59112e] bg-white px-5 py-2.5 rounded-xl border border-[#f2d8e4] shadow-sm hover:shadow-md transition-all active:scale-95"
+          >
+            <Calendar size={18} />
+            <span>{formatDate(selectedDate)}</span>
+          </button>
 
-            {/* Calendar Popup */}
-            <AnimatePresence>
-                {showCalendar && (
-                    <div onClick={(e) => e.stopPropagation()}>
-                        <CalendarWidget 
-                            selectedDate={selectedDate} 
-                            onSelect={handleDateSelect} 
-                            onClose={() => setShowCalendar(false)} 
-                        />
-                    </div>
-                )}
-            </AnimatePresence>
+          {/* Calendar Popup */}
+          <AnimatePresence>
+            {showCalendar && (
+              <div onClick={(e) => e.stopPropagation()}>
+                <CalendarWidget
+                  selectedDate={selectedDate}
+                  onSelect={handleDateSelect}
+                  onClose={() => setShowCalendar(false)}
+                />
+              </div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -353,28 +354,26 @@ const Dashboard = () => {
                 </h2>
                 <p className="text-sm text-slate-500 font-medium mt-1">Revenue vs. Previous Period</p>
               </div>
-              
+
               {/* Dynamic Toggle Buttons */}
               <div className="flex bg-[#f8f9fa] p-1 rounded-xl border border-slate-100">
-                <button 
-                    onClick={() => setTimeRange('Weekly')}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        timeRange === 'Weekly' 
-                        ? 'bg-white shadow-sm text-[#59112e]' 
-                        : 'text-slate-500 hover:text-[#59112e]'
+                <button
+                  onClick={() => setTimeRange('Weekly')}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${timeRange === 'Weekly'
+                    ? 'bg-white shadow-sm text-[#59112e]'
+                    : 'text-slate-500 hover:text-[#59112e]'
                     }`}
                 >
-                    Weekly
+                  Weekly
                 </button>
-                <button 
-                    onClick={() => setTimeRange('Monthly')}
-                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        timeRange === 'Monthly' 
-                        ? 'bg-white shadow-sm text-[#59112e]' 
-                        : 'text-slate-500 hover:text-[#59112e]'
+                <button
+                  onClick={() => setTimeRange('Monthly')}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${timeRange === 'Monthly'
+                    ? 'bg-white shadow-sm text-[#59112e]'
+                    : 'text-slate-500 hover:text-[#59112e]'
                     }`}
                 >
-                    Monthly
+                  Monthly
                 </button>
               </div>
             </div>
@@ -487,8 +486,8 @@ const Dashboard = () => {
                 <div key={item.id} className="flex items-start gap-4 p-4 rounded-2xl bg-white border border-slate-100 hover:border-[#f2d8e4] hover:shadow-md transition-all cursor-pointer group">
                   {/* Icon Marker */}
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border shadow-sm ${item.type === 'order'
-                      ? 'bg-[#fdf2f6] text-[#59112e] border-[#f2d8e4]'
-                      : 'bg-blue-50 text-blue-600 border-blue-100'
+                    ? 'bg-[#fdf2f6] text-[#59112e] border-[#f2d8e4]'
+                    : 'bg-blue-50 text-blue-600 border-blue-100'
                     }`}>
                     {item.type === 'order' ? <ShoppingBag size={20} /> : <Truck size={20} />}
                   </div>
@@ -498,7 +497,7 @@ const Dashboard = () => {
                     <div className="flex justify-between items-start mb-1">
                       <h4 className="text-sm font-bold text-slate-800 truncate">{item.title}</h4>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${item.priority === 'High' ? 'bg-rose-100 text-rose-600' :
-                          item.priority === 'Medium' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'
+                        item.priority === 'Medium' ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'
                         }`}>{item.priority}</span>
                     </div>
                     <p className="text-xs text-slate-500 mb-2 truncate">{item.desc}</p>
