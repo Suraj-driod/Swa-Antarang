@@ -15,9 +15,11 @@ import {
   User,
   RotateCw
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { useAuth } from '../../app/providers/AuthContext';
-import { getRawInventory, getListedInventory } from '../../services/inventoryService';
+import { getRawInventory, getListedInventory, updateRawStock, bulkInsertRawItems, bulkInsertListedItems } from '../../services/inventoryService';
 import { getProductImageUrl } from '../../services/storageService';
+import { processExcelInventory } from '../../services/aiService';
 
 // Status map from DB enum to display
 const STATUS_MAP = {
@@ -79,6 +81,8 @@ const InventoryDashboard = () => {
   ]);
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const [excelProcessing, setExcelProcessing] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -101,7 +105,7 @@ const InventoryDashboard = () => {
       })));
       setListedItems((listed || []).map(l => ({
         ...l,
-        price: `$${Number(l.price).toFixed(2)}`,
+        price: `₹${Number(l.price).toFixed(2)}`,
         views: 'N/A',
         imageUrl: getProductImageUrl(l.image_url),
       })));
@@ -113,40 +117,227 @@ const InventoryDashboard = () => {
       .finally(() => setLoadingData(false));
   }, [user?.merchantProfileId]);
 
+  const pendingRefillRef = useRef(null);
+
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
 
-    // Add user message
-    const newMsg = { id: Date.now(), sender: 'user', content: inputValue };
+    const msg = inputValue.trim();
+    const newMsg = { id: Date.now(), sender: 'user', content: msg };
     setChatMessages(prev => [...prev, newMsg]);
     setInputValue("");
 
-    // Simulate AI processing
-    setTimeout(() => {
+    const refillItem = pendingRefillRef.current;
+    pendingRefillRef.current = null;
+
+    if (refillItem) {
+      // Process refill: update Supabase + local state
+      const REFILL_QTY = 50;
+      const newStock = refillItem.stock + REFILL_QTY;
+
       setChatMessages(prev => [...prev, {
         id: Date.now() + 1,
         sender: 'ai',
-        content: "I've parsed that message. Updating 50 units of 'Teak Wood' and marking 'Steel Rods' as received. 📦✅"
+        content: `Processing refill for '${refillItem.name}'... ⏳`
       }]);
-    }, 1500);
-  };
 
-  const handleQuickAction = (type) => {
-    if (type === 'excel') {
-      const userMsg = { id: Date.now(), sender: 'user', content: "Importing Q1_Inventory.xlsx...", attachment: "Q1_Inventory.xlsx" };
-      setChatMessages(prev => [...prev, userMsg]);
+      updateRawStock(refillItem.id, newStock)
+        .then((updated) => {
+          const displayStatus = STATUS_MAP[updated.status] || updated.status;
+          // Update local state
+          setRawItems(prev => prev.map(item =>
+            item.id === refillItem.id
+              ? { ...item, stock: updated.stock, status: displayStatus }
+              : item
+          ));
+          // Replace processing msg with success
+          setChatMessages(prev => {
+            const filtered = prev.filter(m => m.content !== `Processing refill for '${refillItem.name}'... ⏳`);
+            return [...filtered, {
+              id: Date.now() + 2,
+              sender: 'ai',
+              content: `Refill complete! Added ${REFILL_QTY} ${refillItem.unit} to '${refillItem.name}'. Stock updated: ${refillItem.stock} → ${updated.stock} ${refillItem.unit}. Status: ${displayStatus}. 📦✅`
+            }];
+          });
+        })
+        .catch((err) => {
+          console.error('Refill failed:', err);
+          setChatMessages(prev => {
+            const filtered = prev.filter(m => m.content !== `Processing refill for '${refillItem.name}'... ⏳`);
+            return [...filtered, {
+              id: Date.now() + 2,
+              sender: 'ai',
+              content: `Failed to refill '${refillItem.name}'. Please try again. ❌`
+            }];
+          });
+        });
+    } else {
+      // Generic chat - no refill context
       setTimeout(() => {
         setChatMessages(prev => [...prev, {
           id: Date.now() + 1,
           sender: 'ai',
-          content: "File processed! Added 124 new SKUs to your Raw Materials inventory."
+          content: `I've received your message. Please use the Refill button or upload an Excel sheet to update inventory.`
         }]);
-      }, 2000);
+      }, 1500);
     }
   };
 
-  const handleRefill = (itemName) => {
-    setInputValue(`Refill request for ${itemName}...`);
+  const handleQuickAction = (type) => {
+    if (type === 'excel') {
+      fileInputRef.current?.click();
+    }
+  };
+
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+
+    if (!user?.merchantProfileId) {
+      setChatMessages(prev => [...prev, { id: Date.now(), sender: 'ai', content: "You need to be logged in as a merchant to import inventory. ❌" }]);
+      return;
+    }
+
+    const fileName = file.name;
+
+    setChatMessages(prev => [...prev,
+      { id: Date.now(), sender: 'user', content: `Importing ${fileName}...`, attachment: fileName },
+    ]);
+    setExcelProcessing(true);
+
+    try {
+      // 1. Parse Excel client-side
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const sheetData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+      if (!sheetData.length) {
+        setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: "The Excel file appears to be empty or couldn't be read. ❌" }]);
+        setExcelProcessing(false);
+        return;
+      }
+
+      const columns = Object.keys(sheetData[0]);
+      const columnsLower = columns.map(c => c.toLowerCase());
+      // Auto-detect: if any column header contains "listed", target listed items; otherwise use active tab
+      const detectedType = columnsLower.some(c => c.includes('listed')) ? 'listed' : 
+                           columnsLower.some(c => c.includes('raw')) ? 'raw' : activeTab;
+      const targetType = detectedType;
+      const targetLabel = targetType === 'raw' ? 'Raw Items' : 'Listed Items';
+
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 2, sender: 'ai',
+        content: `Found ${sheetData.length} rows with columns: ${columns.join(', ')}. Detected as ${targetLabel}. Sending to AI... 🤖`
+      }]);
+
+      // 2. Send to Gemini for intelligent parsing
+      const parsedItems = await processExcelInventory(sheetData, targetType);
+
+      if (!parsedItems || parsedItems.length === 0) {
+        setChatMessages(prev => [...prev, {
+          id: Date.now() + 3, sender: 'ai',
+          content: "AI returned 0 items. The columns might not match any inventory fields. ❌"
+        }]);
+        setExcelProcessing(false);
+        return;
+      }
+
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 4, sender: 'ai',
+        content: `AI extracted ${parsedItems.length} items. Saving to ${targetLabel}... 💾`
+      }]);
+
+      // 3. Insert into Supabase
+      let inserted;
+      if (targetType === 'raw') {
+        inserted = await bulkInsertRawItems(user.merchantProfileId, parsedItems);
+        const updatedRaw = await getRawInventory(user.merchantProfileId);
+        setRawItems((updatedRaw || []).map(r => ({
+          ...r,
+          supplier: r.supplier_name,
+          status: STATUS_MAP[r.status] || r.status,
+        })));
+      } else {
+        inserted = await bulkInsertListedItems(user.merchantProfileId, parsedItems);
+        const updatedListed = await getListedInventory(user.merchantProfileId);
+        setListedItems((updatedListed || []).map(l => ({
+          ...l,
+          price: `₹${Number(l.price).toFixed(2)}`,
+          views: 'N/A',
+          imageUrl: getProductImageUrl(l.image_url),
+        })));
+      }
+
+      // 4. Success
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 5, sender: 'ai',
+        content: `Import complete! Added ${inserted.length} items to ${targetLabel} from "${fileName}". ✅📦`
+      }]);
+
+    } catch (err) {
+      console.error('Excel import failed:', err);
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 7,
+        sender: 'ai',
+        content: `Failed to import: ${err.message || 'Unknown error'}. Please try again. ❌`
+      }]);
+    } finally {
+      setExcelProcessing(false);
+    }
+  };
+
+  const handleRefill = (item) => {
+    pendingRefillRef.current = item;
+    const refillMsg = `Refill request for ${item.name}...`;
+    setInputValue(refillMsg);
+    // Auto-send after a tick so input renders first
+    setTimeout(() => {
+      setInputValue("");
+      const newMsg = { id: Date.now(), sender: 'user', content: refillMsg };
+      setChatMessages(prev => [...prev, newMsg]);
+
+      const REFILL_QTY = 50;
+      const newStock = item.stock + REFILL_QTY;
+
+      setChatMessages(prev => [...prev, {
+        id: Date.now() + 1,
+        sender: 'ai',
+        content: `Processing refill for '${item.name}'... ⏳`
+      }]);
+
+      updateRawStock(item.id, newStock)
+        .then((updated) => {
+          const displayStatus = STATUS_MAP[updated.status] || updated.status;
+          setRawItems(prev => prev.map(r =>
+            r.id === item.id
+              ? { ...r, stock: updated.stock, status: displayStatus }
+              : r
+          ));
+          setChatMessages(prev => {
+            const filtered = prev.filter(m => m.content !== `Processing refill for '${item.name}'... ⏳`);
+            return [...filtered, {
+              id: Date.now() + 2,
+              sender: 'ai',
+              content: `Refill complete! Added ${REFILL_QTY} ${item.unit} to '${item.name}'. Stock updated: ${item.stock} → ${updated.stock} ${item.unit}. Status: ${displayStatus}. 📦✅`
+            }];
+          });
+        })
+        .catch((err) => {
+          console.error('Refill failed:', err);
+          setChatMessages(prev => {
+            const filtered = prev.filter(m => m.content !== `Processing refill for '${item.name}'... ⏳`);
+            return [...filtered, {
+              id: Date.now() + 2,
+              sender: 'ai',
+              content: `Failed to refill '${item.name}'. Please try again. ❌`
+            }];
+          });
+        });
+
+      pendingRefillRef.current = null;
+    }, 100);
   };
 
   return (
@@ -265,7 +456,7 @@ const InventoryDashboard = () => {
                       <div className="col-span-2 text-right hidden md:flex items-center justify-end gap-2">
                         {/* Refill Button */}
                         <button
-                          onClick={() => handleRefill(item.name)}
+                          onClick={() => handleRefill(item)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fdf2f6] text-[#59112e] rounded-lg text-xs font-bold hover:bg-[#59112e] hover:text-white transition-colors border border-[#f2d8e4]"
                         >
                           <RotateCw size={14} /> Refill
@@ -330,7 +521,7 @@ const InventoryDashboard = () => {
                       {/* Refill Button for Cards (Positions unchanged, but now background is clear) */}
                       <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
-                          onClick={() => handleRefill(item.name)}
+                          onClick={() => handleRefill(item)}
                           className="p-2 bg-[#fdf2f6] text-[#59112e] rounded-lg shadow-md hover:bg-[#59112e] hover:text-white transition-colors border border-[#f2d8e4]"
                           title="Refill Stock"
                         >
@@ -380,16 +571,28 @@ const InventoryDashboard = () => {
             </div>
           </div>
 
+          {/* Hidden file input for Excel */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={handleExcelUpload}
+          />
+
           {/* Quick Import Actions */}
           <div className="grid grid-cols-2 gap-2 mt-4">
             <button
               onClick={() => handleQuickAction('excel')}
-              className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl border border-[#f2d8e4] shadow-sm hover:border-[#59112e]/30 hover:shadow-md transition-all group"
+              disabled={excelProcessing}
+              className="flex flex-col items-center gap-2 p-3 bg-white rounded-xl border border-[#f2d8e4] shadow-sm hover:border-[#59112e]/30 hover:shadow-md transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <div className="w-8 h-8 rounded-full bg-[#f0fdf4] text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                <FileSpreadsheet size={16} />
+              <div className={`w-8 h-8 rounded-full bg-[#f0fdf4] text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform ${excelProcessing ? 'animate-spin' : ''}`}>
+                {excelProcessing ? <RotateCw size={16} /> : <FileSpreadsheet size={16} />}
               </div>
-              <span className="text-xs font-semibold text-slate-500 group-hover:text-[#59112e]">Excel Import</span>
+              <span className="text-xs font-semibold text-slate-500 group-hover:text-[#59112e]">
+                {excelProcessing ? 'Processing...' : 'Excel Import'}
+              </span>
             </button>
             <button
               onClick={() => { setInputValue("Copied from WhatsApp: Received 200 chairs from Zenith"); }}
@@ -430,7 +633,11 @@ const InventoryDashboard = () => {
             </button>
           </div>
           <div className="flex justify-between items-center mt-2 px-1">
-            <button className="text-slate-400 hover:text-[#59112e] transition-colors">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={excelProcessing}
+              className="text-slate-400 hover:text-[#59112e] transition-colors disabled:opacity-50"
+            >
               <Paperclip size={16} />
             </button>
             <span className="text-[10px] text-slate-400/70">AI processes natural language & files</span>

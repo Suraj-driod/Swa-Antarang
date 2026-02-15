@@ -89,6 +89,45 @@ export async function updateListedStock(itemId, newStock) {
     return data;
 }
 
+// ── Bulk inserts (for Excel import) ──
+
+export async function bulkInsertRawItems(merchantProfileId, items) {
+    const payload = items.map(item => ({
+        merchant_id: merchantProfileId,
+        name: item.name,
+        sku: item.sku || null,
+        stock: parseInt(item.stock) || 0,
+        unit: item.unit || 'pcs',
+        supplier_name: item.supplier_name || null,
+        status: (parseInt(item.stock) || 0) <= 0 ? 'out_of_stock' : (parseInt(item.stock) || 0) < 10 ? 'low_stock' : 'in_stock',
+    }));
+    const { data, error } = await supabase
+        .from('inventory_raw')
+        .insert(payload)
+        .select();
+    if (error) throw error;
+    return data;
+}
+
+export async function bulkInsertListedItems(merchantProfileId, items) {
+    const payload = items.map(item => ({
+        merchant_id: merchantProfileId,
+        name: item.name,
+        sku: item.sku || null,
+        price: parseFloat(item.price) || 0,
+        stock: parseInt(item.stock) || 0,
+        unit: item.unit || 'pcs',
+        platform: item.platform || null,
+        category: item.category || null,
+    }));
+    const { data, error } = await supabase
+        .from('inventory_listed')
+        .insert(payload)
+        .select();
+    if (error) throw error;
+    return data;
+}
+
 // Browse listed inventory (for customers — no merchant filter)
 export async function browseListedInventory() {
     const { data, error } = await supabase
