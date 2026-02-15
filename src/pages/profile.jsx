@@ -258,9 +258,9 @@ export default function ProfilePage() {
                                 <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     {isMerchant && (
                                         <>
-                                            <PrivilegeCard label="Business Name" value={MERCHANT_MOCK.businessName} color="text-[#59112e]" bg="bg-[#fdf2f6]" />
+                                            <PrivilegeCard label="Company Name" value={MERCHANT_MOCK.businessName} color="text-[#59112e]" bg="bg-[#fdf2f6]" />
                                             <PrivilegeCard label="GSTIN" value={MERCHANT_MOCK.gstin} color="text-violet-600" bg="bg-violet-50" />
-                                            <PrivilegeCard label="Business Type" value={MERCHANT_MOCK.businessType} color="text-emerald-600" bg="bg-emerald-50" />
+                                            <PrivilegeCard label="Company Type" value={MERCHANT_MOCK.businessType} color="text-emerald-600" bg="bg-emerald-50" />
                                             <PrivilegeCard label="Member Since" value={MERCHANT_MOCK.since} color="text-amber-600" bg="bg-amber-50" />
                                         </>
                                     )}

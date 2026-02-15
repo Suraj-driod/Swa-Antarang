@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import SwaAntarangLogo from "./Logo";
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import {
@@ -35,8 +36,8 @@ const Navbar = ({ items = [], brandTitle = 'Swa-Antarang', brandSub = 'Platform'
           <Link to="/" className="flex items-center gap-3 bg-white/80 backdrop-blur-xl border border-[#fbcfe8] px-4 py-2.5 rounded-full shadow-[0_4px_20px_-4px_rgba(89,17,46,0.08)] ring-1 ring-white/50 group cursor-pointer transition-all hover:scale-[1.02]">
             <div className="relative">
               <div className="absolute inset-0 bg-[#59112e] rounded-full blur-md opacity-20 group-hover:opacity-40 transition-opacity"></div>
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#59112e] to-[#9d174d] flex items-center justify-center text-white shadow-md relative z-10">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="w-4 h-4"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
+              <div className="w-10 h-10 rounded-full overflow-hidden shadow-md relative z-10">
+                <SwaAntarangLogo width={40} height={40} />
               </div>
             </div>
             <div className="pr-1">
