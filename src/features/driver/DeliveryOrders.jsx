@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   X,
   Camera,
+  Route,
 } from "lucide-react";
 
 import ChatWidget from "./components/ChatWidget";
@@ -273,19 +274,26 @@ const DeliveryOrders = () => {
     // Refresh active deliveries after successful scan
     if (user?.driverProfileId) {
       getAssignedDeliveries(user.driverProfileId).then(data => {
-        setActiveOrders(data.map(d => ({
-          id: d.id,
-          orderId: d.order_id,
-          shop: d.orders?.merchant_profiles?.business_name || 'Merchant',
-          customer: d.orders?.shipping_address?.fullName || 'Customer',
-          address: d.orders?.shipping_address?.addressLine || '-',
-          status: d.status === 'pending' ? 'Pickup Pending' : d.status === 'picked_up' ? 'Picked Up' : 'In Transit',
-          price: `₹${Number(d.orders?.total_amount || 0).toFixed(0)}`,
-          distance: '-',
-          time: '-',
-          items: d.orders?.order_items?.map(i => i.product_name).join(', ') || '-',
-          contactName: d.orders?.shipping_address?.fullName || '-',
-        })));
+        setActiveOrders(data.map(d => {
+          const routePlan = d.gps_log && typeof d.gps_log === 'object' && !Array.isArray(d.gps_log) ? d.gps_log : null;
+          return {
+            id: d.id,
+            orderId: d.order_id,
+            shop: d.orders?.merchant_profiles?.business_name || 'Merchant',
+            customer: d.orders?.shipping_address?.fullName || 'Customer',
+            address: d.orders?.shipping_address?.addressLine || '-',
+            status: d.status === 'pending' ? 'Pickup Pending' : d.status === 'picked_up' ? 'Picked Up' : 'In Transit',
+            price: `₹${Number(d.orders?.total_amount || 0).toFixed(0)}`,
+            distance: routePlan?.totalDistance ? `${routePlan.totalDistance} km` : '-',
+            time: routePlan?.totalDuration ? `${routePlan.totalDuration} min` : '-',
+            items: d.orders?.order_items?.map(i => i.product_name).join(', ') || '-',
+            contactName: d.orders?.shipping_address?.fullName || '-',
+            stops: routePlan?.stops || [],
+            totalStops: routePlan?.stops?.length || 0,
+            deliveryLat: d.orders?.shipping_address?.lat || routePlan?.stops?.[0]?.lat || null,
+            deliveryLng: d.orders?.shipping_address?.lng || routePlan?.stops?.[0]?.lng || null,
+          };
+        }));
       }).catch(console.error);
     }
   };
@@ -296,19 +304,26 @@ const DeliveryOrders = () => {
 
     // Fetch Active Deliveries
     getAssignedDeliveries(user.driverProfileId).then(data => {
-      setActiveOrders(data.map(d => ({
-        id: d.id,
-        orderId: d.order_id,
-        shop: d.orders?.merchant_profiles?.business_name || 'Merchant',
-        customer: d.orders?.shipping_address?.fullName || 'Customer',
-        address: d.orders?.shipping_address?.addressLine || '-',
-        status: d.status === 'pending' ? 'Pickup Pending' : d.status === 'picked_up' ? 'Picked Up' : 'In Transit',
-        price: `₹${Number(d.orders?.total_amount || 0).toFixed(0)}`,
-        distance: '-',
-        time: '-',
-        items: d.orders?.order_items?.map(i => i.product_name).join(', ') || '-',
-        contactName: d.orders?.shipping_address?.fullName || '-',
-      })));
+      setActiveOrders(data.map(d => {
+        const routePlan = d.gps_log && typeof d.gps_log === 'object' && !Array.isArray(d.gps_log) ? d.gps_log : null;
+        return {
+          id: d.id,
+          orderId: d.order_id,
+          shop: d.orders?.merchant_profiles?.business_name || 'Merchant',
+          customer: d.orders?.shipping_address?.fullName || 'Customer',
+          address: d.orders?.shipping_address?.addressLine || '-',
+          status: d.status === 'pending' ? 'Pickup Pending' : d.status === 'picked_up' ? 'Picked Up' : 'In Transit',
+          price: `₹${Number(d.orders?.total_amount || 0).toFixed(0)}`,
+          distance: routePlan?.totalDistance ? `${routePlan.totalDistance} km` : '-',
+          time: routePlan?.totalDuration ? `${routePlan.totalDuration} min` : '-',
+          items: d.orders?.order_items?.map(i => i.product_name).join(', ') || '-',
+          contactName: d.orders?.shipping_address?.fullName || '-',
+          stops: routePlan?.stops || [],
+          totalStops: routePlan?.stops?.length || 0,
+          deliveryLat: d.orders?.shipping_address?.lat || routePlan?.stops?.[0]?.lat || null,
+          deliveryLng: d.orders?.shipping_address?.lng || routePlan?.stops?.[0]?.lng || null,
+        };
+      }));
     }).catch(console.error);
 
     // Fetch Open Requests
@@ -467,6 +482,22 @@ const DeliveryOrders = () => {
                     <span className="text-sm text-slate-400 ml-2 font-medium">{order.distance}</span>
                   </div>
 
+                  {/* Route Info */}
+                  {order.totalStops > 0 && (
+                    <div className="pl-4 mb-4 flex gap-2">
+                      <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 border border-blue-100 rounded-lg">
+                        <Route size={12} className="text-blue-600" />
+                        <span className="text-[10px] font-bold text-blue-700">{order.totalStops} stops</span>
+                      </div>
+                      {order.time !== '-' && (
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg">
+                          <Clock size={12} className="text-emerald-600" />
+                          <span className="text-[10px] font-bold text-emerald-700">{order.time}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex gap-2 pl-4">
                     <button
                       onClick={() => setShowScanner(true)}
@@ -475,7 +506,13 @@ const DeliveryOrders = () => {
                       <QrCode size={16} /> Scan QR
                     </button>
                     <button
-                      onClick={() => { }}
+                      onClick={() => {
+                        if (order.deliveryLat && order.deliveryLng) {
+                          window.open(`https://www.google.com/maps/dir/?api=1&destination=${order.deliveryLat},${order.deliveryLng}`, '_blank');
+                        } else {
+                          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(order.address)}`, '_blank');
+                        }
+                      }}
                       className="w-11 bg-slate-50 text-slate-500 rounded-xl flex items-center justify-center border border-slate-100 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
                     >
                       <Navigation size={18} />

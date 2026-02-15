@@ -18,6 +18,8 @@ import {
 import { useAuth } from '../../app/providers/AuthContext';
 import { getRawInventory, getListedInventory } from '../../services/inventoryService';
 import { getProductImageUrl } from '../../services/storageService';
+import { chatWithGemini } from '../../services/aiService';
+import { createRefillRequest } from '../../services/b2bService';
 
 // Status map from DB enum to display
 const STATUS_MAP = {
@@ -78,7 +80,9 @@ const InventoryDashboard = () => {
     { id: 1, sender: 'ai', content: "Hi there! 👋 I'm your Inventory Assistant. You can upload an Excel sheet or paste a WhatsApp message to update stock instantly." }
   ]);
   const [inputValue, setInputValue] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const chatHistoryRef = useRef([]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -113,40 +117,46 @@ const InventoryDashboard = () => {
       .finally(() => setLoadingData(false));
   }, [user?.merchantProfileId]);
 
+  const sendToGemini = async (userText) => {
+    chatHistoryRef.current.push({ role: 'user', text: userText });
+    setIsAiLoading(true);
+    try {
+      const reply = await chatWithGemini(chatHistoryRef.current, 'merchant');
+      chatHistoryRef.current.push({ role: 'model', text: reply });
+      setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: reply }]);
+    } catch {
+      setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: "Sorry, I couldn't process that. Please try again." }]);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
+
   const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
-
-    // Add user message
-    const newMsg = { id: Date.now(), sender: 'user', content: inputValue };
-    setChatMessages(prev => [...prev, newMsg]);
+    if (!inputValue.trim() || isAiLoading) return;
+    const text = inputValue;
+    setChatMessages(prev => [...prev, { id: Date.now(), sender: 'user', content: text }]);
     setInputValue("");
-
-    // Simulate AI processing
-    setTimeout(() => {
-      setChatMessages(prev => [...prev, {
-        id: Date.now() + 1,
-        sender: 'ai',
-        content: "I've parsed that message. Updating 50 units of 'Teak Wood' and marking 'Steel Rods' as received. 📦✅"
-      }]);
-    }, 1500);
+    sendToGemini(text);
   };
 
   const handleQuickAction = (type) => {
     if (type === 'excel') {
       const userMsg = { id: Date.now(), sender: 'user', content: "Importing Q1_Inventory.xlsx...", attachment: "Q1_Inventory.xlsx" };
       setChatMessages(prev => [...prev, userMsg]);
-      setTimeout(() => {
-        setChatMessages(prev => [...prev, {
-          id: Date.now() + 1,
-          sender: 'ai',
-          content: "File processed! Added 124 new SKUs to your Raw Materials inventory."
-        }]);
-      }, 2000);
+      sendToGemini("I'm importing an Excel file called Q1_Inventory.xlsx. Help me process it for my inventory.");
     }
   };
 
-  const handleRefill = (itemName) => {
-    setInputValue(`Refill request for ${itemName}...`);
+  const handleRefill = async (item) => {
+    const itemName = item.name || item;
+    setChatMessages(prev => [...prev, { id: Date.now(), sender: 'user', content: `Refill request for ${itemName}` }]);
+    try {
+      await createRefillRequest(user.merchantProfileId, item.id, item.quantity || 1);
+      setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: `✅ Refill request for **${itemName}** has been submitted successfully! Your supplier will be notified.` }]);
+    } catch (err) {
+      console.error('Refill request failed:', err);
+      setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: `❌ Failed to submit refill request for ${itemName}. Please try again.` }]);
+    }
   };
 
   return (
@@ -265,7 +275,7 @@ const InventoryDashboard = () => {
                       <div className="col-span-2 text-right hidden md:flex items-center justify-end gap-2">
                         {/* Refill Button */}
                         <button
-                          onClick={() => handleRefill(item.name)}
+                          onClick={() => handleRefill(item)}
                           className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fdf2f6] text-[#59112e] rounded-lg text-xs font-bold hover:bg-[#59112e] hover:text-white transition-colors border border-[#f2d8e4]"
                         >
                           <RotateCw size={14} /> Refill
@@ -408,6 +418,20 @@ const InventoryDashboard = () => {
           {chatMessages.map(msg => (
             <ChatMessage key={msg.id} msg={msg} />
           ))}
+          {isAiLoading && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-white shadow-sm bg-gradient-to-br from-[#59112e] to-[#851e45] text-white">
+                <Bot size={16} />
+              </div>
+              <div className="bg-white border border-[#f2d8e4] p-3.5 rounded-2xl rounded-tl-none shadow-sm">
+                <div className="flex gap-1.5">
+                  <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </motion.div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
