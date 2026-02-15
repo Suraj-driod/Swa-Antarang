@@ -125,3 +125,15 @@ export async function cancelOrder(orderId) {
     if (error) throw error;
     return data;
 }
+
+// ── Lookup order by QR code (used by driver scan) ──
+
+export async function getOrderByQrCode(qrCode) {
+    const { data, error } = await supabase
+        .from('orders')
+        .select('*, order_items(*), merchant_profiles!merchant_id(business_name)')
+        .eq('qr_code', qrCode)
+        .single();
+    if (error) throw error;
+    return data;
+}

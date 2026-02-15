@@ -113,3 +113,45 @@ export async function getDeliveryByOrder(orderId) {
     if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
     return data;
 }
+
+// ── Driver: verify QR and complete delivery in one step ──
+
+export async function verifyAndCompleteByQR(qrCode, driverProfileId) {
+    // 1. Find the order by qr_code
+    const { data: order, error: orderErr } = await supabase
+        .from('orders')
+        .select('id, qr_code, merchant_id, merchant_profiles!merchant_id(business_name)')
+        .eq('qr_code', qrCode)
+        .single();
+    if (orderErr || !order) throw new Error('Invalid QR code — no matching order found');
+
+    // 2. Find the delivery assigned to this driver for this order
+    const { data: delivery, error: delErr } = await supabase
+        .from('deliveries')
+        .select('id, status')
+        .eq('order_id', order.id)
+        .eq('driver_id', driverProfileId)
+        .single();
+    if (delErr || !delivery) throw new Error('No delivery assigned to you for this order');
+    if (delivery.status === 'delivered') throw new Error('This delivery is already completed');
+
+    // 3. Mark delivered — DB trigger will also update order status
+    const { data: updated, error: updateErr } = await supabase
+        .from('deliveries')
+        .update({
+            status: 'delivered',
+            delivered_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        })
+        .eq('id', delivery.id)
+        .select()
+        .single();
+    if (updateErr) throw updateErr;
+
+    return {
+        delivery: updated,
+        order,
+        merchantName: order.merchant_profiles?.business_name || 'Merchant',
+    };
+}
+

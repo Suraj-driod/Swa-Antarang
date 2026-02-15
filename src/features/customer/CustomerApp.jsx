@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -114,7 +115,7 @@ const ProductCard = ({ product, onAdd }) => (
 );
 
 // 2. QR Code Modal
-const QRCodeModal = ({ onClose, onScanSuccess }) => {
+const QRCodeModal = ({ onClose, onScanSuccess, qrCode, orderNumber }) => {
   const [scanning, setScanning] = useState(false);
 
   const handleSimulateScan = () => {
@@ -157,25 +158,25 @@ const QRCodeModal = ({ onClose, onScanSuccess }) => {
         <div className="relative -mt-10 bg-white mx-6 rounded-2xl shadow-xl p-6 flex flex-col items-center text-center">
           {!scanning ? (
             <>
-              <div
-                className="w-56 h-56 bg-slate-900 rounded-xl flex items-center justify-center mb-4 relative overflow-hidden group cursor-pointer border-4 border-white shadow-sm"
-                onClick={handleSimulateScan}
-              >
-                <div className="absolute inset-0 bg-[url('https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=Example')] bg-cover opacity-90 mix-blend-screen"></div>
-                <ScanLine
-                  size={48}
-                  className="text-white animate-pulse relative z-10"
+              <div className="w-56 h-56 bg-white rounded-xl flex items-center justify-center mb-4 border-2 border-slate-100 shadow-inner p-3">
+                <QRCodeSVG
+                  value={qrCode || 'no-qr'}
+                  size={192}
+                  level="H"
+                  bgColor="#ffffff"
+                  fgColor="#1e293b"
                 />
               </div>
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">
-                Order #8821
-              </p>
-              <button
-                onClick={handleSimulateScan}
-                className="mt-6 w-full py-3 bg-[#fdf2f6] text-[#59112e] font-bold rounded-xl text-xs hover:bg-[#59112e] hover:text-white transition-colors border border-[#f2d8e4]"
-              >
-                Simulate Driver Scan
-              </button>
+              <div className="bg-slate-50 px-4 py-2 rounded-full mb-2">
+                <p className="text-xs text-slate-600 font-bold">
+                  Order #{orderNumber}
+                </p>
+              </div>
+              <p className="text-[11px] text-slate-400 mb-4">Scan to verify & complete delivery</p>
+              <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full">
+                <Shield size={12} />
+                <span className="text-[10px] font-bold">Encrypted & Secure</span>
+              </div>
             </>
           ) : (
             <div className="py-12 flex flex-col items-center">
@@ -184,7 +185,7 @@ const QRCodeModal = ({ onClose, onScanSuccess }) => {
               </div>
               <h3 className="text-2xl font-bold text-slate-800">Verified!</h3>
               <p className="text-slate-500 text-sm mt-2">
-                Inventory deducted & Order Completed.
+                Delivery confirmed & Order Completed.
               </p>
             </div>
           )}
@@ -978,15 +979,17 @@ const OrdersTrackingPage = ({ orders, onBackToShop }) => {
 
                 {/* QR Code Card */}
                 <div className="relative -mt-10 bg-white mx-6 rounded-2xl shadow-xl p-6 flex flex-col items-center text-center">
-                  <div className="w-56 h-56 bg-white rounded-xl flex items-center justify-center mb-4 relative overflow-hidden border-2 border-slate-100 shadow-inner">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=SWA-ANTARANG-ORDER-${order.orderNumber}-${order.id}`}
-                      alt="Delivery QR Code"
-                      className="w-48 h-48"
+                  <div className="w-56 h-56 bg-white rounded-xl flex items-center justify-center mb-4 border-2 border-slate-100 shadow-inner p-3">
+                    <QRCodeSVG
+                      value={order.qr_code || order.qrCode || `SWA-ORDER-${order.id}`}
+                      size={192}
+                      level="H"
+                      bgColor="#ffffff"
+                      fgColor="#1e293b"
                     />
                   </div>
                   <div className="bg-slate-50 px-4 py-2 rounded-full mb-2">
-                    <p className="text-xs text-slate-600 font-bold">Order #{order.orderNumber}</p>
+                    <p className="text-xs text-slate-600 font-bold">Order #{order.orderNumber || order.id?.slice(0, 8)}</p>
                   </div>
                   <p className="text-[11px] text-slate-400 mb-4">Scan to verify & complete delivery</p>
                   <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full">

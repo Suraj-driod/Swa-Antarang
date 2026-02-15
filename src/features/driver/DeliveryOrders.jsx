@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Package,
@@ -9,12 +9,186 @@ import {
   Phone,
   Send,
   SlidersHorizontal,
+  QrCode,
+  ScanLine,
+  CheckCircle2,
+  X,
+  Camera,
 } from "lucide-react";
 
 import ChatWidget from "./components/ChatWidget";
 import { useAuth } from '../../app/providers/AuthContext';
-import { getAssignedDeliveries } from '../../services/deliveryService';
+import { getAssignedDeliveries, verifyAndCompleteByQR } from '../../services/deliveryService';
 import { getOpenOndcRequests } from '../../services/logisticsService';
+
+// --- QR Scanner Modal ---
+const QRScannerModal = ({ onClose, onScanSuccess, driverProfileId }) => {
+  const scannerRef = useRef(null);
+  const html5QrCodeRef = useRef(null);
+  const [scanResult, setScanResult] = useState(null); // null | 'success' | 'error'
+  const [resultMessage, setResultMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+
+  const startCamera = async () => {
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode');
+      const scanner = new Html5Qrcode('qr-reader');
+      html5QrCodeRef.current = scanner;
+
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        async (decodedText) => {
+          // Stop scanning immediately on first result
+          await scanner.stop();
+          setCameraActive(false);
+          handleScannedCode(decodedText);
+        },
+        () => { } // ignore errors during scanning
+      );
+      setCameraActive(true);
+    } catch (err) {
+      console.error('Camera error:', err);
+      setResultMessage('Camera access denied or unavailable. Use manual entry below.');
+    }
+  };
+
+  const handleScannedCode = async (qrCode) => {
+    setLoading(true);
+    try {
+      const result = await verifyAndCompleteByQR(qrCode, driverProfileId);
+      setScanResult('success');
+      setResultMessage(`Delivery confirmed for ${result.merchantName}!`);
+      setTimeout(() => {
+        onScanSuccess(result);
+      }, 2000);
+    } catch (err) {
+      setScanResult('error');
+      setResultMessage(err.message || 'Verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSimulateScan = () => {
+    const code = prompt('Enter QR code value (from order):');
+    if (code) handleScannedCode(code.trim());
+  };
+
+  useEffect(() => {
+    return () => {
+      if (html5QrCodeRef.current && cameraActive) {
+        html5QrCodeRef.current.stop().catch(() => { });
+      }
+    };
+  }, [cameraActive]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-[#2d0b16]/60 backdrop-blur-md"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.85, y: 30 }}
+        animate={{ scale: 1, y: 0 }}
+        exit={{ scale: 0.85, y: 30 }}
+        transition={{ type: 'spring', bounce: 0.3 }}
+        className="bg-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/40 text-white z-20 transition-colors"
+        >
+          <X size={16} />
+        </button>
+
+        {/* Header */}
+        <div className="bg-gradient-to-br from-[#59112e] to-[#7a1b42] p-8 text-center pt-10 pb-16 relative overflow-hidden">
+          <div className="absolute top-[-20px] left-[-20px] w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+          <div className="absolute bottom-[-20px] right-[-20px] w-32 h-32 bg-rose-500/20 rounded-full blur-xl"></div>
+          <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-white/15 flex items-center justify-center backdrop-blur-sm">
+            <ScanLine size={28} className="text-white" />
+          </div>
+          <h2 className="text-white text-xl font-bold relative z-10">Scan Delivery QR</h2>
+          <p className="text-white/70 text-xs relative z-10 mt-1">Scan customer's QR code to confirm delivery</p>
+        </div>
+
+        {/* Scanner Area */}
+        <div className="relative -mt-10 bg-white mx-6 rounded-2xl shadow-xl p-6 flex flex-col items-center text-center">
+          {scanResult === null && (
+            <>
+              <div
+                id="qr-reader"
+                ref={scannerRef}
+                className="w-full rounded-xl overflow-hidden mb-4"
+                style={{ minHeight: cameraActive ? 280 : 0 }}
+              />
+
+              {!cameraActive && (
+                <button
+                  onClick={startCamera}
+                  className="w-full py-3.5 bg-[#59112e] text-white rounded-xl font-bold text-sm shadow-lg shadow-[#59112e]/20 hover:bg-[#450d24] transition-colors flex items-center justify-center gap-2 mb-3"
+                >
+                  <Camera size={18} /> Open Camera Scanner
+                </button>
+              )}
+
+              <button
+                onClick={handleSimulateScan}
+                className="w-full py-3 bg-[#fdf2f6] text-[#59112e] font-bold rounded-xl text-xs border border-[#f2d8e4] hover:bg-[#59112e] hover:text-white transition-colors"
+              >
+                Enter QR Code Manually
+              </button>
+
+              {resultMessage && (
+                <p className="text-xs text-rose-500 font-medium mt-3">{resultMessage}</p>
+              )}
+            </>
+          )}
+
+          {scanResult === 'success' && (
+            <div className="py-10 flex flex-col items-center">
+              <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600 mb-5 animate-bounce">
+                <CheckCircle2 size={40} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">Delivery Verified!</h3>
+              <p className="text-slate-500 text-sm mt-2">{resultMessage}</p>
+            </div>
+          )}
+
+          {scanResult === 'error' && (
+            <div className="py-10 flex flex-col items-center">
+              <div className="w-20 h-20 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 mb-5">
+                <X size={40} />
+              </div>
+              <h3 className="text-xl font-bold text-slate-800">Verification Failed</h3>
+              <p className="text-slate-500 text-sm mt-2">{resultMessage}</p>
+              <button
+                onClick={() => { setScanResult(null); setResultMessage(''); }}
+                className="mt-5 px-6 py-2.5 bg-[#59112e] text-white rounded-xl font-bold text-sm"
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+
+          {loading && (
+            <div className="py-10 flex flex-col items-center">
+              <div className="w-12 h-12 border-4 border-[#59112e] border-t-transparent rounded-full animate-spin mb-4"></div>
+              <p className="text-sm font-bold text-slate-600">Verifying...</p>
+            </div>
+          )}
+        </div>
+        <div className="h-6"></div>
+      </motion.div>
+    </motion.div>
+  );
+};
 
 // --- Negotiation Panel ---
 const NegotiationPanel = ({ basePrice, onCancel, onSubmit }) => {
@@ -92,11 +266,34 @@ const DeliveryOrders = () => {
   const [requests, setRequests] = useState([]);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatContact, setChatContact] = useState(null);
+  const [showScanner, setShowScanner] = useState(false);
+
+  const handleScanSuccess = (result) => {
+    setShowScanner(false);
+    // Refresh active deliveries after successful scan
+    if (user?.driverProfileId) {
+      getAssignedDeliveries(user.driverProfileId).then(data => {
+        setActiveOrders(data.map(d => ({
+          id: d.id,
+          orderId: d.order_id,
+          shop: d.orders?.merchant_profiles?.business_name || 'Merchant',
+          customer: d.orders?.shipping_address?.fullName || 'Customer',
+          address: d.orders?.shipping_address?.addressLine || '-',
+          status: d.status === 'pending' ? 'Pickup Pending' : d.status === 'picked_up' ? 'Picked Up' : 'In Transit',
+          price: `₹${Number(d.orders?.total_amount || 0).toFixed(0)}`,
+          distance: '-',
+          time: '-',
+          items: d.orders?.order_items?.map(i => i.product_name).join(', ') || '-',
+          contactName: d.orders?.shipping_address?.fullName || '-',
+        })));
+      }).catch(console.error);
+    }
+  };
 
   // Fetch assigned deliveries + ONDC open requests
   useEffect(() => {
     if (!user?.driverProfileId) return;
-    
+
     // Fetch Active Deliveries
     getAssignedDeliveries(user.driverProfileId).then(data => {
       setActiveOrders(data.map(d => ({
@@ -216,8 +413,8 @@ const DeliveryOrders = () => {
                 key={filter}
                 onClick={() => setActiveFilter(filter)}
                 className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all border ${activeFilter === filter
-                    ? "bg-[#59112e] text-white border-[#59112e] shadow-sm"
-                    : "bg-white text-slate-500 border-slate-200 hover:border-[#59112e] hover:text-[#59112e]"
+                  ? "bg-[#59112e] text-white border-[#59112e] shadow-sm"
+                  : "bg-white text-slate-500 border-slate-200 hover:border-[#59112e] hover:text-[#59112e]"
                   }`}
               >
                 {filter}
@@ -272,10 +469,16 @@ const DeliveryOrders = () => {
 
                   <div className="flex gap-2 pl-4">
                     <button
-                      onClick={() => { }}
+                      onClick={() => setShowScanner(true)}
                       className="flex-1 py-3 bg-[#59112e] text-white rounded-xl font-bold text-sm shadow-md flex items-center justify-center gap-2 hover:bg-[#450d24] transition-colors"
                     >
-                      <Navigation size={16} /> Navigate
+                      <QrCode size={16} /> Scan QR
+                    </button>
+                    <button
+                      onClick={() => { }}
+                      className="w-11 bg-slate-50 text-slate-500 rounded-xl flex items-center justify-center border border-slate-100 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                    >
+                      <Navigation size={18} />
                     </button>
                     <button
                       onClick={() => alert(`Calling ${order.contactName}...`)}
@@ -391,6 +594,17 @@ const DeliveryOrders = () => {
         onClose={() => setChatOpen(false)}
         contact={chatContact}
       />
+
+      {/* QR Scanner Modal */}
+      <AnimatePresence>
+        {showScanner && (
+          <QRScannerModal
+            onClose={() => setShowScanner(false)}
+            onScanSuccess={handleScanSuccess}
+            driverProfileId={user?.driverProfileId}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
