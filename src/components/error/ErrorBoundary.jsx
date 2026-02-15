@@ -77,8 +77,8 @@ class ErrorBoundary extends React.Component {
                             <div className="text-center mb-8">
                                 <h1 className="text-2xl font-bold text-[#2d0b16] mb-2">System Malfunction</h1>
                                 <p className="text-[#6b4c59] text-sm leading-relaxed">
-                                    Our inventory tracking system encountered an unexpected issue.
-                                    Don't worry, your data is safe. We've notified the engineering team.
+                                    Swa-Antaranga encountered an unexpected issue.
+                                    Don't worry, your data is safe. Please be patient!
                                 </p>
                             </div>
 
