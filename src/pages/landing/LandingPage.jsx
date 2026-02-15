@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Store, Truck, ShoppingBag, Package, ArrowRight, ArrowUpRight, Zap, Eye, Route } from 'lucide-react';
+import SwaAntarangLogo from '../../components/ui/Logo';
 
 const fade = {
   hidden: { opacity: 0, y: 24 },
@@ -35,7 +36,7 @@ export default function LandingPage() {
           animate="visible"
           variants={stagger}
         >
-          
+
 
           <motion.h1
             variants={fade}
@@ -471,8 +472,8 @@ export default function LandingPage() {
       <footer className="bg-white border-t border-border-soft py-14 px-6 sm:px-8">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-8">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white">
-              <Package size={16} />
+            <div className="w-9 h-9 rounded-lg overflow-hidden shadow-sm">
+              <SwaAntarangLogo width={36} height={36} />
             </div>
             <span className="font-display font-bold text-text-main">Swa-Antarang</span>
           </div>
