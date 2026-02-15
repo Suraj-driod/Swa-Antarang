@@ -149,21 +149,25 @@ const RouteOptimizer = () => {
     const [pushed, setPushed] = useState(false);
     const [processingStages, setProcessingStages] = useState([]);
     const [festivals, setFestivals] = useState([]);
+    const [loadingData, setLoadingData] = useState(true);
 
     // Fetch orders and drivers on mount
     useEffect(() => {
         if (!user?.merchantProfileId) return;
 
-        getOrdersByMerchant(user.merchantProfileId)
-            .then(data => {
-                const pending = data.filter(o => ['pending', 'confirmed', 'packed'].includes(o.status));
-                setOrders(pending);
-            })
-            .catch(err => console.error('Failed to fetch orders:', err));
-
-        getMerchantDrivers()
-            .then(data => setDrivers(data))
-            .catch(err => console.error('Failed to fetch drivers:', err));
+        setLoadingData(true);
+        Promise.all([
+            getOrdersByMerchant(user.merchantProfileId),
+            getMerchantDrivers()
+        ]).then(([orderData, driverData]) => {
+            const pending = orderData.filter(o => ['pending', 'confirmed', 'packed'].includes(o.status));
+            setOrders(pending);
+            setDrivers(driverData);
+        }).catch(err => {
+            console.error('Failed to fetch data:', err);
+        }).finally(() => {
+            setLoadingData(false);
+        });
 
         setFestivals(getNearbyFestivals());
     }, [user?.merchantProfileId]);
@@ -237,7 +241,7 @@ const RouteOptimizer = () => {
         : [[merchantLocation.lat, merchantLocation.lng]];
 
     return (
-        <div className="min-h-screen bg-[#f8f9fa] font-outfit text-[#2d0b16] flex flex-col md:flex-row overflow-hidden">
+        <div className="min-h-screen bg-[#f8f9fa] font-outfit text-[#2d0b16] flex flex-col md:flex-row overflow-hidden pt-20">
 
             {/* === LEFT SIDEBAR === */}
             <div className="w-full md:w-[88px] bg-white border-r border-[#f2d8e4] flex flex-col items-center py-8 gap-8 z-30 shadow-[4px_0_24px_rgba(89,17,46,0.02)]">
@@ -263,7 +267,7 @@ const RouteOptimizer = () => {
             </div>
 
             {/* === MAIN CONTENT === */}
-            <div className="flex-1 flex flex-col h-screen relative bg-[#fafafa]">
+            <div className="flex-1 flex flex-col h-[calc(100vh-5rem)] relative bg-[#fafafa]">
 
                 {/* Header */}
                 <div className="h-24 px-10 flex items-center justify-between shrink-0 bg-white/80 backdrop-blur-sm border-b border-[#f2d8e4] z-20">
@@ -324,7 +328,7 @@ const RouteOptimizer = () => {
                                                         initial={{ opacity: 0, y: -8 }}
                                                         animate={{ opacity: 1, y: 0 }}
                                                         exit={{ opacity: 0, y: -8 }}
-                                                        className="absolute top-full mt-2 left-0 right-0 bg-white border border-[#f2d8e4] rounded-xl shadow-xl z-20 overflow-hidden"
+                                                        className="absolute top-full mt-2 left-0 right-0 bg-white border border-[#f2d8e4] rounded-xl shadow-2xl z-[1001] overflow-hidden"
                                                     >
                                                         {drivers.length === 0 ? (
                                                             <div className="p-4 text-xs text-gray-400 text-center">No drivers found</div>
@@ -406,8 +410,8 @@ const RouteOptimizer = () => {
                                                     {idx + 1}
                                                 </div>
                                                 <div className={`p-4 rounded-2xl border transition-all ${stop.traffic?.congestion === 'High'
-                                                        ? 'bg-amber-50 border-amber-200'
-                                                        : 'bg-white border-[#f2d8e4] hover:border-[#59112e]/30'
+                                                    ? 'bg-amber-50 border-amber-200'
+                                                    : 'bg-white border-[#f2d8e4] hover:border-[#59112e]/30'
                                                     }`}>
                                                     <div className="flex justify-between items-start mb-2">
                                                         <h4 className="font-bold text-[#2d0b16] text-sm">{stop.order_items?.[0]?.product_name || stop.geocodedAddress || `Order #${(stop.id || '').slice(0, 8)}`}</h4>
@@ -416,14 +420,14 @@ const RouteOptimizer = () => {
                                                     <p className="text-[10px] text-[#6b4c59] mb-2 truncate">📍 {stop.geocodedAddress || 'Nearby'}</p>
                                                     <div className="flex flex-wrap gap-2">
                                                         <span className={`text-[10px] px-2 py-1 rounded-lg font-medium border ${stop.priority === 'High' ? 'bg-pink-50 text-pink-600 border-pink-100' :
-                                                                stop.priority === 'Medium' ? 'bg-[#fdf2f6] text-[#59112e] border-[#f2d8e4]' :
-                                                                    'bg-gray-50 text-gray-600 border-gray-200'
+                                                            stop.priority === 'Medium' ? 'bg-[#fdf2f6] text-[#59112e] border-[#f2d8e4]' :
+                                                                'bg-gray-50 text-gray-600 border-gray-200'
                                                             }`}>
                                                             {stop.priority} Priority
                                                         </span>
                                                         <span className={`text-[10px] px-2 py-1 rounded-lg font-medium border ${stop.traffic?.congestion === 'High' ? 'bg-red-50 text-red-600 border-red-100' :
-                                                                stop.traffic?.congestion === 'Medium' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                                                    'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                                            stop.traffic?.congestion === 'Medium' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                                                'bg-emerald-50 text-emerald-600 border-emerald-100'
                                                             }`}>
                                                             Traffic: {stop.traffic?.congestion || 'Unknown'}
                                                         </span>
@@ -470,6 +474,7 @@ const RouteOptimizer = () => {
                             <div className="flex-1 bg-white rounded-[2.5rem] border border-[#f2d8e4] shadow-sm relative overflow-hidden">
                                 {routeReady && routeData ? (
                                     <MapContainer
+                                        key={routeData.id || 'optimized-map'}
                                         center={[merchantLocation.lat, merchantLocation.lng]}
                                         zoom={12}
                                         className="w-full h-full z-0"

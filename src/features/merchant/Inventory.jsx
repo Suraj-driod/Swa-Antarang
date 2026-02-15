@@ -80,9 +80,10 @@ const InventoryDashboard = () => {
     { id: 1, sender: 'ai', content: "Hi there! 👋 I'm your Inventory Assistant. You can upload an Excel sheet or paste a WhatsApp message to update stock instantly." }
   ]);
   const [inputValue, setInputValue] = useState("");
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [excelProcessing, setExcelProcessing] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const [excelProcessing, setExcelProcessing] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -117,227 +118,65 @@ const InventoryDashboard = () => {
       .finally(() => setLoadingData(false));
   }, [user?.merchantProfileId]);
 
-  const pendingRefillRef = useRef(null);
-
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
 
-    const msg = inputValue.trim();
-    const newMsg = { id: Date.now(), sender: 'user', content: msg };
+    // Add user message
+    const newMsg = { id: Date.now(), sender: 'user', content: inputValue };
     setChatMessages(prev => [...prev, newMsg]);
     setInputValue("");
 
-    const refillItem = pendingRefillRef.current;
-    pendingRefillRef.current = null;
-
-    if (refillItem) {
-      // Process refill: update Supabase + local state
-      const REFILL_QTY = 50;
-      const newStock = refillItem.stock + REFILL_QTY;
-
+    // Simulate AI processing
+    setTimeout(() => {
       setChatMessages(prev => [...prev, {
         id: Date.now() + 1,
         sender: 'ai',
-        content: `Processing refill for '${refillItem.name}'... ⏳`
+        content: "I've parsed that message. Updating 50 units of 'Teak Wood' and marking 'Steel Rods' as received. 📦✅"
       }]);
-
-      updateRawStock(refillItem.id, newStock)
-        .then((updated) => {
-          const displayStatus = STATUS_MAP[updated.status] || updated.status;
-          // Update local state
-          setRawItems(prev => prev.map(item =>
-            item.id === refillItem.id
-              ? { ...item, stock: updated.stock, status: displayStatus }
-              : item
-          ));
-          // Replace processing msg with success
-          setChatMessages(prev => {
-            const filtered = prev.filter(m => m.content !== `Processing refill for '${refillItem.name}'... ⏳`);
-            return [...filtered, {
-              id: Date.now() + 2,
-              sender: 'ai',
-              content: `Refill complete! Added ${REFILL_QTY} ${refillItem.unit} to '${refillItem.name}'. Stock updated: ${refillItem.stock} → ${updated.stock} ${refillItem.unit}. Status: ${displayStatus}. 📦✅`
-            }];
-          });
-        })
-        .catch((err) => {
-          console.error('Refill failed:', err);
-          setChatMessages(prev => {
-            const filtered = prev.filter(m => m.content !== `Processing refill for '${refillItem.name}'... ⏳`);
-            return [...filtered, {
-              id: Date.now() + 2,
-              sender: 'ai',
-              content: `Failed to refill '${refillItem.name}'. Please try again. ❌`
-            }];
-          });
-        });
-    } else {
-      // Generic chat - no refill context
-      setTimeout(() => {
-        setChatMessages(prev => [...prev, {
-          id: Date.now() + 1,
-          sender: 'ai',
-          content: `I've received your message. Please use the Refill button or upload an Excel sheet to update inventory.`
-        }]);
-      }, 1500);
-    }
+    }, 1500);
   };
 
   const handleQuickAction = (type) => {
-    if (type === 'excel') {
-      fileInputRef.current?.click();
-    }
-  };
-
-  const handleExcelUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-
-    if (!user?.merchantProfileId) {
-      setChatMessages(prev => [...prev, { id: Date.now(), sender: 'ai', content: "You need to be logged in as a merchant to import inventory. ❌" }]);
-      return;
-    }
-
-    const fileName = file.name;
-
-    setChatMessages(prev => [...prev,
-      { id: Date.now(), sender: 'user', content: `Importing ${fileName}...`, attachment: fileName },
-    ]);
-    setExcelProcessing(true);
-
-    try {
-      // 1. Parse Excel client-side
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
-      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const sheetData = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
-
-      if (!sheetData.length) {
-        setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: "The Excel file appears to be empty or couldn't be read. ❌" }]);
-        setExcelProcessing(false);
-        return;
-      }
-
-      const columns = Object.keys(sheetData[0]);
-      const columnsLower = columns.map(c => c.toLowerCase());
-      // Auto-detect: if any column header contains "listed", target listed items; otherwise use active tab
-      const detectedType = columnsLower.some(c => c.includes('listed')) ? 'listed' : 
-                           columnsLower.some(c => c.includes('raw')) ? 'raw' : activeTab;
-      const targetType = detectedType;
-      const targetLabel = targetType === 'raw' ? 'Raw Items' : 'Listed Items';
-
-      setChatMessages(prev => [...prev, {
-        id: Date.now() + 2, sender: 'ai',
-        content: `Found ${sheetData.length} rows with columns: ${columns.join(', ')}. Detected as ${targetLabel}. Sending to AI... 🤖`
-      }]);
-
-      // 2. Send to Gemini for intelligent parsing
-      const parsedItems = await processExcelInventory(sheetData, targetType);
-
-      if (!parsedItems || parsedItems.length === 0) {
-        setChatMessages(prev => [...prev, {
-          id: Date.now() + 3, sender: 'ai',
-          content: "AI returned 0 items. The columns might not match any inventory fields. ❌"
-        }]);
-        setExcelProcessing(false);
-        return;
-      }
-
-      setChatMessages(prev => [...prev, {
-        id: Date.now() + 4, sender: 'ai',
-        content: `AI extracted ${parsedItems.length} items. Saving to ${targetLabel}... 💾`
-      }]);
-
-      // 3. Insert into Supabase
-      let inserted;
-      if (targetType === 'raw') {
-        inserted = await bulkInsertRawItems(user.merchantProfileId, parsedItems);
-        const updatedRaw = await getRawInventory(user.merchantProfileId);
-        setRawItems((updatedRaw || []).map(r => ({
-          ...r,
-          supplier: r.supplier_name,
-          status: STATUS_MAP[r.status] || r.status,
-        })));
-      } else {
-        inserted = await bulkInsertListedItems(user.merchantProfileId, parsedItems);
-        const updatedListed = await getListedInventory(user.merchantProfileId);
-        setListedItems((updatedListed || []).map(l => ({
-          ...l,
-          price: `₹${Number(l.price).toFixed(2)}`,
-          views: 'N/A',
-          imageUrl: getProductImageUrl(l.image_url),
-        })));
-      }
-
-      // 4. Success
-      setChatMessages(prev => [...prev, {
-        id: Date.now() + 5, sender: 'ai',
-        content: `Import complete! Added ${inserted.length} items to ${targetLabel} from "${fileName}". ✅📦`
-      }]);
-
-    } catch (err) {
-      console.error('Excel import failed:', err);
-      setChatMessages(prev => [...prev, {
-        id: Date.now() + 7,
-        sender: 'ai',
-        content: `Failed to import: ${err.message || 'Unknown error'}. Please try again. ❌`
-      }]);
-    } finally {
-      setExcelProcessing(false);
-    }
+    if (type === 'excel') fileInputRef.current?.click();
   };
 
   const handleRefill = (item) => {
-    pendingRefillRef.current = item;
-    const refillMsg = `Refill request for ${item.name}...`;
-    setInputValue(refillMsg);
-    // Auto-send after a tick so input renders first
-    setTimeout(() => {
-      setInputValue("");
-      const newMsg = { id: Date.now(), sender: 'user', content: refillMsg };
-      setChatMessages(prev => [...prev, newMsg]);
+    const name = typeof item === 'object' && item?.name != null ? item.name : item;
+    setInputValue(`Refill request for ${name}...`);
+  };
 
-      const REFILL_QTY = 50;
-      const newStock = item.stock + REFILL_QTY;
-
-      setChatMessages(prev => [...prev, {
-        id: Date.now() + 1,
-        sender: 'ai',
-        content: `Processing refill for '${item.name}'... ⏳`
-      }]);
-
-      updateRawStock(item.id, newStock)
-        .then((updated) => {
-          const displayStatus = STATUS_MAP[updated.status] || updated.status;
-          setRawItems(prev => prev.map(r =>
-            r.id === item.id
-              ? { ...r, stock: updated.stock, status: displayStatus }
-              : r
-          ));
-          setChatMessages(prev => {
-            const filtered = prev.filter(m => m.content !== `Processing refill for '${item.name}'... ⏳`);
-            return [...filtered, {
-              id: Date.now() + 2,
-              sender: 'ai',
-              content: `Refill complete! Added ${REFILL_QTY} ${item.unit} to '${item.name}'. Stock updated: ${item.stock} → ${updated.stock} ${item.unit}. Status: ${displayStatus}. 📦✅`
-            }];
-          });
-        })
-        .catch((err) => {
-          console.error('Refill failed:', err);
-          setChatMessages(prev => {
-            const filtered = prev.filter(m => m.content !== `Processing refill for '${item.name}'... ⏳`);
-            return [...filtered, {
-              id: Date.now() + 2,
-              sender: 'ai',
-              content: `Failed to refill '${item.name}'. Please try again. ❌`
-            }];
-          });
-        });
-
-      pendingRefillRef.current = null;
-    }, 100);
+  const handleExcelUpload = async (e) => {
+    const file = e?.target?.files?.[0];
+    if (!file || !user?.merchantProfileId) return;
+    setExcelProcessing(true);
+    const fileName = file.name;
+    setChatMessages(prev => [...prev, { id: Date.now(), sender: 'user', content: `Importing ${fileName}...`, attachment: fileName }]);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const firstSheet = wb.Sheets[wb.SheetNames[0]];
+      const sheetData = XLSX.utils.sheet_to_json(firstSheet);
+      const targetType = activeTab === 'raw' ? 'raw' : 'listed';
+      const items = await processExcelInventory(sheetData, targetType);
+      if (targetType === 'raw') {
+        await bulkInsertRawItems(user.merchantProfileId, items);
+      } else {
+        await bulkInsertListedItems(user.merchantProfileId, items);
+      }
+      const [raw, listed] = await Promise.all([
+        getRawInventory(user.merchantProfileId),
+        getListedInventory(user.merchantProfileId),
+      ]);
+      setRawItems((raw || []).map(r => ({ ...r, supplier: r.supplier_name, status: STATUS_MAP[r.status] || r.status })));
+      setListedItems((listed || []).map(l => ({ ...l, price: `₹${Number(l.price).toFixed(2)}`, views: 'N/A', imageUrl: getProductImageUrl(l.image_url) })));
+      setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: `File processed! Added ${items.length} items to your ${targetType === 'raw' ? 'Raw Materials' : 'Listed'} inventory.` }]);
+    } catch (err) {
+      console.error('Excel import error:', err);
+      setChatMessages(prev => [...prev, { id: Date.now() + 1, sender: 'ai', content: `Import failed: ${err?.message || 'Unknown error'}. Please try again.` }]);
+    } finally {
+      setExcelProcessing(false);
+      e.target.value = '';
+    }
   };
 
   return (
@@ -611,6 +450,20 @@ const InventoryDashboard = () => {
           {chatMessages.map(msg => (
             <ChatMessage key={msg.id} msg={msg} />
           ))}
+          {isAiLoading && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-3 mb-4">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border border-white shadow-sm bg-gradient-to-br from-[#59112e] to-[#851e45] text-white">
+                <Bot size={16} />
+              </div>
+              <div className="bg-white border border-[#f2d8e4] p-3.5 rounded-2xl rounded-tl-none shadow-sm">
+                <div className="flex gap-1.5">
+                  <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 bg-[#59112e]/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </motion.div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
