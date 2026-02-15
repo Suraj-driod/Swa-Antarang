@@ -10,6 +10,7 @@ import {
     Copy,
     Check
 } from 'lucide-react';
+import { supabase } from '../../services/supabaseClient';
 
 class ErrorBoundary extends React.Component {
     constructor(props) {
@@ -40,16 +41,18 @@ class ErrorBoundary extends React.Component {
         setTimeout(() => this.setState({ copied: false }), 2000);
     };
 
-    handleReload = () => {
+    signOutAndLeave = async (thenReload = false) => {
         this.setState({ hasError: false, error: null, errorInfo: null });
-        window.location.reload();
+        try {
+            await supabase.auth.signOut();
+        } finally {
+            if (thenReload) window.location.reload();
+            else window.location.href = '/';
+        }
     };
 
-    handleGoHome = () => {
-        // Reset error state and navigate without full page reload
-        this.setState({ hasError: false, error: null, errorInfo: null });
-        window.location.href = '/';
-    };
+    handleReload = () => this.signOutAndLeave(true);
+    handleGoHome = () => this.signOutAndLeave(false);
 
     render() {
         if (this.state.hasError) {
