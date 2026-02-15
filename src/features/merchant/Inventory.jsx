@@ -12,7 +12,8 @@ import {
   Send, 
   Paperclip,
   ArrowUpRight,
-  User
+  User,
+  RotateCw
 } from 'lucide-react';
 
 // --- MOCK DATA ---
@@ -120,8 +121,11 @@ const InventoryDashboard = () => {
       }
   };
 
+  const handleRefill = (itemName) => {
+      setInputValue(`Refill request for ${itemName}...`);
+  };
+
   return (
-    // FIX: Added 'pt-24' (padding-top: 6rem) to account for the fixed Navbar height
     <div className="min-h-screen bg-[#fdf2f6]/50 font-outfit p-4 md:p-6 pt-24 md:pt-28 flex flex-col md:flex-row gap-6 text-slate-800">
       
       {/* ==============================================
@@ -130,7 +134,7 @@ const InventoryDashboard = () => {
       <motion.div 
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
-        className="flex-1 bg-white rounded-[2rem] shadow-xl shadow-[#59112e]/5 border border-[#f2d8e4] overflow-hidden flex flex-col h-[calc(100vh-8rem)]" // Constrained height for scrolling
+        className="flex-1 bg-white rounded-[2rem] shadow-xl shadow-[#59112e]/5 border border-[#f2d8e4] overflow-hidden flex flex-col h-[calc(100vh-8rem)]"
       >
         
         {/* --- Header & Toggle --- */}
@@ -140,7 +144,7 @@ const InventoryDashboard = () => {
             <p className="text-slate-500 text-sm">Manage your supply chain & listings</p>
           </div>
 
-          {/* THE TOGGLE - Centered & Animated */}
+          {/* THE TOGGLE */}
           <div className="bg-[#fdf2f6] p-1.5 rounded-full flex relative border border-[#f2d8e4]">
              <motion.div 
                 className="absolute top-1.5 bottom-1.5 bg-white rounded-full shadow-sm z-0"
@@ -198,8 +202,8 @@ const InventoryDashboard = () => {
                         <div className="col-span-4">Item Name</div>
                         <div className="col-span-2">SKU</div>
                         <div className="col-span-2">Quantity</div>
-                        <div className="col-span-3">Status</div>
-                        <div className="col-span-1"></div>
+                        <div className="col-span-2">Status</div>
+                        <div className="col-span-2 text-right">Actions</div>
                     </div>
                     
                     {RAW_ITEMS.map((item) => (
@@ -221,11 +225,18 @@ const InventoryDashboard = () => {
                                 <span className="md:hidden text-xs font-bold text-slate-400">Qty:</span>
                                 {item.stock} <span className="text-xs font-normal text-slate-500">{item.unit}</span>
                             </div>
-                            <div className="col-span-3 flex items-center gap-2">
+                            <div className="col-span-2 flex items-center gap-2">
                                 <span className="md:hidden text-xs font-bold text-slate-400">Status:</span>
                                 <StatusBadge status={item.status} />
                             </div>
-                            <div className="col-span-1 text-right hidden md:block">
+                            <div className="col-span-2 text-right hidden md:flex items-center justify-end gap-2">
+                                {/* Refill Button */}
+                                <button 
+                                    onClick={() => handleRefill(item.name)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#fdf2f6] text-[#59112e] rounded-lg text-xs font-bold hover:bg-[#59112e] hover:text-white transition-colors border border-[#f2d8e4]"
+                                >
+                                    <RotateCw size={14} /> Refill
+                                </button>
                                 <button className="p-2 hover:bg-[#fdf2f6] rounded-lg text-slate-400 hover:text-[#59112e] transition-colors">
                                     <MoreHorizontal size={18} />
                                 </button>
@@ -243,7 +254,6 @@ const InventoryDashboard = () => {
                 >
                     {LISTED_ITEMS.map((item) => (
                           <div key={item.id} className="bg-white p-5 rounded-2xl border border-[#f2d8e4]/50 shadow-sm hover:border-[#59112e]/20 hover:shadow-lg hover:shadow-[#59112e]/5 transition-all group relative overflow-hidden">
-                             {/* Decorative highlight */}
                              <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-[#59112e]/5 to-transparent rounded-bl-full -mr-10 -mt-10"></div>
                              
                              <div className="flex justify-between items-start mb-4 relative">
@@ -256,20 +266,33 @@ const InventoryDashboard = () => {
                              <h3 className="font-bold text-lg text-slate-800 mb-1">{item.name}</h3>
                              <p className="text-sm text-slate-500 mb-4 font-mono">{item.sku}</p>
                              
-                             <div className="flex items-center justify-between pt-4 border-t border-[#f2d8e4]/30">
+                             {/* MODIFIED FOOTER: Aligned to start to prevent button overlap */}
+                             <div className="flex items-center gap-6 pt-4 border-t border-[#f2d8e4]/30">
                                  <div>
                                      <div className="text-xs text-slate-500">Price</div>
                                      <div className="font-bold text-[#59112e]">{item.price}</div>
                                  </div>
-                                 <div className="text-right">
+                                 
+                                 {/* Moved Stock to left with divider */}
+                                 <div className="pl-6 border-l border-[#f2d8e4]">
                                      <div className="text-xs text-slate-500">Stock Level</div>
                                      <div className={`font-bold ${item.stock < 10 ? 'text-amber-600' : 'text-emerald-600'}`}>{item.stock} units</div>
                                  </div>
                              </div>
                              
-                             <button className="absolute bottom-4 right-4 p-2 bg-[#59112e] text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-lg">
-                                 <ArrowUpRight size={18} />
-                             </button>
+                             {/* Refill Button for Cards (Positions unchanged, but now background is clear) */}
+                             <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button 
+                                    onClick={() => handleRefill(item.name)}
+                                    className="p-2 bg-[#fdf2f6] text-[#59112e] rounded-lg shadow-md hover:bg-[#59112e] hover:text-white transition-colors border border-[#f2d8e4]"
+                                    title="Refill Stock"
+                                >
+                                    <RotateCw size={18} />
+                                </button>
+                                <button className="p-2 bg-[#59112e] text-white rounded-lg shadow-lg hover:bg-[#450d24] transition-colors">
+                                    <ArrowUpRight size={18} />
+                                </button>
+                             </div>
                           </div>
                     ))}
                 </motion.div>
