@@ -9,6 +9,7 @@ import {
   Map,
   Home,
   ShoppingBag,
+  Navigation,
 } from 'lucide-react';
 
 export const merchantNavItems = [
@@ -17,6 +18,7 @@ export const merchantNavItems = [
   { to: '/merchant/Propogation', icon: Radio, label: 'Propagate' },
   { to: '/merchant/Requests', icon: MessageSquare, label: 'Requests', badge: true },
   { to: '/merchant/Track', icon: MapPin, label: 'Track' },
+  { to: '/merchant/Route', icon: Navigation, label: 'Route' },
 ];
 
 export const driverNavItems = [

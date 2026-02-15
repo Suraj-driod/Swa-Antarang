@@ -25,6 +25,7 @@ import Inventory from '../../features/merchant/Inventory';
 import Propogation from '../../features/merchant/Propogation';
 import Requests from '../../features/merchant/Requests';
 import Track from '../../features/merchant/Track';
+import RouteOptimizer from '../../pages/Route';
 
 // --- Driver Pages ---
 import DashboardDelivery from '../../features/driver/DashboardDelivery';
@@ -65,6 +66,7 @@ export default function AppRouter() {
                                     <Route path="/merchant/Propogation" element={<Propogation />} />
                                     <Route path="/merchant/Requests" element={<Requests />} />
                                     <Route path="/merchant/Track" element={<Track />} />
+                                    <Route path="/merchant/Route" element={<RouteOptimizer />} />
                                 </Route>
                             </Route>
 
