@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, LayoutGroup } from 'framer-motion';
 import {
     MessageSquare,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../app/providers/AuthContext';
 import { createBroadcast, getMyBroadcasts, getMatchesForBuyer, acceptResponse, rejectResponse } from '../../services/propagationService';
+import { getOrCreateConversation, getMyConversations, getMessages, sendMessage, subscribeToMessages } from '../../services/chatService';
 
 const BG_COLORS = ["bg-slate-700", "bg-stone-600", "bg-zinc-500", "bg-amber-700", "bg-indigo-600"];
 
@@ -149,8 +150,12 @@ const PropagationPanel = () => {
     const [itemType, setItemType] = useState('');
     const [radius, setRadius] = useState(20);
 
-    // Chats placeholder (live chat is future scope)
-    const CHATS = [];
+    // Chat state
+    const [conversations, setConversations] = useState([]);
+    const [activeConversation, setActiveConversation] = useState(null);
+    const [chatMessages, setChatMessages] = useState([]);
+    const [messageInput, setMessageInput] = useState('');
+    const messagesEndRef = useRef(null);
 
     // Load live data
     useEffect(() => {
@@ -168,6 +173,7 @@ const PropagationPanel = () => {
       getMatchesForBuyer(user.merchantProfileId).then(data => {
         setCards(data.map((r, i) => ({
           id: r.id,
+          sellerMerchantId: r.seller_merchant_id,
           company: r.merchant_profiles?.business_name || 'Unknown Seller',
           item: r.item_name,
           price: `₹${Number(r.price).toFixed(2)}`,
@@ -227,6 +233,82 @@ const PropagationPanel = () => {
             setRightPanelTab('broadcasts');
             setItemType('');
         } catch (err) {
+            console.error(err);
+        }
+    };
+
+    // Load conversations
+    const loadConversations = async () => {
+        if (!user?.merchantProfileId) return;
+        try {
+            const convs = await getMyConversations(user.merchantProfileId);
+            setConversations(convs);
+        } catch (err) { console.error(err); }
+    };
+
+    useEffect(() => { loadConversations(); }, [user?.merchantProfileId]);
+
+    // Realtime subscription for active chat
+    useEffect(() => {
+        if (!activeConversation) return;
+        const unsubscribe = subscribeToMessages(activeConversation.id, (newMsg) => {
+            if (newMsg.sender_id !== user?.merchantProfileId) {
+                setChatMessages(prev => [...prev, newMsg]);
+            }
+        });
+        return unsubscribe;
+    }, [activeConversation?.id]);
+
+    // Auto-scroll chat to bottom
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [chatMessages]);
+
+    // Open chat with a merchant from the card
+    const handleOpenChat = async () => {
+        const card = cards[currentIndex];
+        if (!card?.sellerMerchantId || !user?.merchantProfileId) return;
+        try {
+            const conv = await getOrCreateConversation(user.merchantProfileId, card.sellerMerchantId, card.item);
+            setActiveConversation({ ...conv, otherName: card.company, otherMerchantId: card.sellerMerchantId });
+            setRightPanelTab('messages');
+            const msgs = await getMessages(conv.id);
+            setChatMessages(msgs);
+            loadConversations();
+        } catch (err) { console.error(err); }
+    };
+
+    // Open an existing conversation from the list
+    const handleOpenConversation = async (conv) => {
+        setActiveConversation(conv);
+        setRightPanelTab('messages');
+        try {
+            const msgs = await getMessages(conv.id);
+            setChatMessages(msgs);
+        } catch (err) { console.error(err); }
+    };
+
+    // Send a message
+    const handleSendMessage = async () => {
+        if (!messageInput.trim() || !activeConversation || !user?.merchantProfileId) return;
+        const msg = messageInput.trim();
+        setMessageInput('');
+        const optimistic = {
+            id: `temp-${Date.now()}`,
+            conversation_id: activeConversation.id,
+            sender_id: user.merchantProfileId,
+            content: msg,
+            created_at: new Date().toISOString(),
+        };
+        setChatMessages(prev => [...prev, optimistic]);
+        try {
+            const sent = await sendMessage(activeConversation.id, user.merchantProfileId, msg);
+            setChatMessages(prev => prev.map(m => m.id === optimistic.id ? sent : m));
+            setConversations(prev => prev.map(c =>
+                c.id === activeConversation.id ? { ...c, last_message: msg, updated_at: new Date().toISOString() } : c
+            ));
+        } catch (err) {
+            setChatMessages(prev => prev.filter(m => m.id !== optimistic.id));
             console.error(err);
         }
     };
@@ -302,6 +384,7 @@ const PropagationPanel = () => {
                                             getMatchesForBuyer(user.merchantProfileId).then(data => {
                                                 setCards(data.map((r, i) => ({
                                                     id: r.id,
+                                                    sellerMerchantId: r.seller_merchant_id,
                                                     company: r.merchant_profiles?.business_name || 'Unknown Seller',
                                                     item: r.item_name,
                                                     price: `₹${Number(r.price).toFixed(2)}`,
@@ -361,7 +444,10 @@ const PropagationPanel = () => {
                             >
                                 <X size={32} strokeWidth={2.5} />
                             </button>
-                            <button className="w-20 h-20 rounded-[2rem] bg-gradient-to-br from-[#59112e] to-[#851e45] text-white shadow-[0_10px_30px_rgba(89,17,46,0.3)] flex items-center justify-center hover:scale-105 hover:shadow-[0_15px_40px_rgba(89,17,46,0.4)] transition-all">
+                            <button
+                                onClick={handleOpenChat}
+                                className="w-20 h-20 rounded-[2rem] bg-gradient-to-br from-[#59112e] to-[#851e45] text-white shadow-[0_10px_30px_rgba(89,17,46,0.3)] flex items-center justify-center hover:scale-105 hover:shadow-[0_15px_40px_rgba(89,17,46,0.4)] transition-all"
+                            >
                                 <MessageSquare size={32} fill="currentColor" />
                             </button>
                             <button
@@ -463,7 +549,7 @@ const PropagationPanel = () => {
                         <h2 className="font-bold text-[#59112e] text-lg mb-5">Activity</h2>
                         <div className="flex p-1 bg-[#fdf2f6] rounded-xl border border-[#f2d8e4]/50">
                             <button
-                                onClick={() => setRightPanelTab('messages')}
+                                onClick={() => { setRightPanelTab('messages'); setActiveConversation(null); setChatMessages([]); }}
                                 className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all ${rightPanelTab === 'messages' ? 'bg-white shadow-sm text-[#59112e]' : 'text-[#6b4c59] hover:text-[#59112e]'}`}
                             >
                                 Messages
@@ -478,11 +564,11 @@ const PropagationPanel = () => {
                     </div>
 
                     {/* List Content */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    <div className="flex-1 overflow-hidden flex flex-col p-4">
 
                         {/* CONDITIONAL RENDER based on Tab */}
                         {rightPanelTab === 'broadcasts' ? (
-                            <div>
+                            <div className="flex-1 overflow-y-auto space-y-3">
                                 <div className="flex items-center justify-between mb-3 px-2">
                                     <h3 className="text-[10px] font-bold text-[#6b4c59] uppercase tracking-wider">Your Broadcasts</h3>
                                     <span className="text-[10px] font-bold bg-[#59112e] text-white px-1.5 py-0.5 rounded-md">{activePropagations.length}</span>
@@ -522,40 +608,111 @@ const PropagationPanel = () => {
                                     <div className="text-center p-8 text-slate-400 text-xs">No active broadcasts</div>
                                 )}
                             </div>
+                        ) : activeConversation ? (
+                            /* Active Chat View */
+                            <div className="flex-1 flex flex-col overflow-hidden">
+                                {/* Chat Header */}
+                                <div className="flex items-center gap-3 pb-4 border-b border-[#f2d8e4] mb-3 shrink-0">
+                                    <button
+                                        onClick={() => { setActiveConversation(null); setChatMessages([]); }}
+                                        className="w-7 h-7 rounded-full bg-[#fdf2f6] flex items-center justify-center text-[#59112e] hover:bg-[#f2d8e4] transition-colors"
+                                    >
+                                        <ArrowLeft size={14} />
+                                    </button>
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#2d0b16] to-[#59112e] flex items-center justify-center text-white text-[10px] font-bold shadow-md">
+                                        {activeConversation.otherName?.[0]?.toUpperCase() || '?'}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-bold text-[#2d0b16] text-xs truncate">{activeConversation.otherName}</h4>
+                                        {activeConversation.context_item && (
+                                            <p className="text-[9px] text-[#6b4c59] truncate">Re: {activeConversation.context_item}</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Messages */}
+                                <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                                    {chatMessages.length === 0 && (
+                                        <div className="text-center py-12 text-slate-400 text-xs">
+                                            Start the conversation — negotiate pricing, delivery, and more.
+                                        </div>
+                                    )}
+                                    {chatMessages.map(msg => {
+                                        const isMine = msg.sender_id === user?.merchantProfileId;
+                                        return (
+                                            <div key={msg.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+                                                <div className={`max-w-[80%] px-3.5 py-2.5 text-xs leading-relaxed ${
+                                                    isMine
+                                                        ? 'bg-[#59112e] text-white rounded-2xl rounded-br-md'
+                                                        : 'bg-[#fdf2f6] text-[#2d0b16] rounded-2xl rounded-bl-md border border-[#f2d8e4]'
+                                                }`}>
+                                                    <p>{msg.content}</p>
+                                                    <p className={`text-[8px] mt-1.5 ${isMine ? 'text-white/50' : 'text-[#6b4c59]/60'}`}>
+                                                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    <div ref={messagesEndRef} />
+                                </div>
+                            </div>
                         ) : (
-                            /* Chat List Section */
-                            <div>
+                            /* Conversations List */
+                            <div className="flex-1 overflow-y-auto">
                                 <h3 className="text-[10px] font-bold text-[#6b4c59] uppercase tracking-wider mb-3 px-2 mt-2">Recent Chats</h3>
-                                {CHATS.map(chat => (
-                                    <div key={chat.id} className="flex items-start gap-3 p-3 hover:bg-[#fdf2f6] rounded-2xl cursor-pointer transition-colors group relative">
+                                {conversations.length === 0 && (
+                                    <div className="text-center py-12 text-slate-400 text-xs">
+                                        No conversations yet. Swipe on a card and tap the chat button to start negotiating.
+                                    </div>
+                                )}
+                                {conversations.map(conv => (
+                                    <div
+                                        key={conv.id}
+                                        onClick={() => handleOpenConversation(conv)}
+                                        className="flex items-start gap-3 p-3 hover:bg-[#fdf2f6] rounded-2xl cursor-pointer transition-colors group"
+                                    >
                                         <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#2d0b16] to-[#59112e] flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-md">
-                                            {chat.initial}
+                                            {conv.otherName?.[0]?.toUpperCase() || '?'}
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between items-baseline mb-0.5">
-                                                <h4 className="font-bold text-[#2d0b16] text-xs truncate group-hover:text-[#59112e] transition-colors">{chat.name}</h4>
-                                                <span className="text-[9px] text-[#6b4c59] font-medium">{chat.time}</span>
+                                                <h4 className="font-bold text-[#2d0b16] text-xs truncate group-hover:text-[#59112e] transition-colors">{conv.otherName}</h4>
+                                                <span className="text-[9px] text-[#6b4c59] font-medium shrink-0 ml-2">
+                                                    {new Date(conv.updated_at).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                                                </span>
                                             </div>
-                                            <p className={`text-[11px] truncate ${chat.unread ? 'font-bold text-[#2d0b16]' : 'text-gray-400 group-hover:text-[#6b4c59]'}`}>
-                                                {chat.msg}
+                                            <p className="text-[11px] truncate text-gray-400 group-hover:text-[#6b4c59]">
+                                                {conv.last_message || conv.context_item || 'Start chatting...'}
                                             </p>
                                         </div>
-                                        {chat.unread && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-2 h-2 bg-rose-500 rounded-full shadow-sm"></div>}
                                     </div>
                                 ))}
                             </div>
                         )}
                     </div>
 
-                    {/* Active Chat Input Area */}
-                    <div className="p-4 border-t border-[#f2d8e4] bg-white shrink-0">
-                        <div className="relative">
-                            <input type="text" placeholder="Type a message..." className="w-full bg-[#fafafa] border border-[#f2d8e4] rounded-xl py-3.5 pl-4 pr-10 text-xs font-medium outline-none focus:border-[#59112e] focus:bg-white transition-all text-[#2d0b16]" />
-                            <button className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-[#59112e] text-white rounded-lg hover:bg-[#4a0e26] transition-colors shadow-md flex items-center justify-center">
-                                <Send size={12} />
-                            </button>
+                    {/* Chat Input — only visible when in active conversation */}
+                    {activeConversation && rightPanelTab === 'messages' ? (
+                        <div className="p-4 border-t border-[#f2d8e4] bg-white shrink-0">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Type a message..."
+                                    value={messageInput}
+                                    onChange={(e) => setMessageInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                                    className="w-full bg-[#fafafa] border border-[#f2d8e4] rounded-xl py-3.5 pl-4 pr-10 text-xs font-medium outline-none focus:border-[#59112e] focus:bg-white transition-all text-[#2d0b16]"
+                                />
+                                <button
+                                    onClick={handleSendMessage}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-[#59112e] text-white rounded-lg hover:bg-[#4a0e26] transition-colors shadow-md flex items-center justify-center"
+                                >
+                                    <Send size={12} />
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    ) : null}
 
                 </div>
 

@@ -89,6 +89,7 @@ export async function getMatchesForBuyer(merchantProfileId) {
         .from('propagation_responses')
         .select('*, propagation_broadcasts!inner(merchant_id, item_name), merchant_profiles!seller_merchant_id(business_name, lat, lng)')
         .eq('propagation_broadcasts.merchant_id', merchantProfileId)
+        .neq('seller_merchant_id', merchantProfileId)
         .eq('status', 'pending')
         .order('distance_km', { ascending: true });
     if (error) throw error;
