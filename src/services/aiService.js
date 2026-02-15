@@ -87,6 +87,70 @@ export async function chatWithGemini(messages, role = 'customer') {
     }
 }
 
+// ── Process Excel inventory data with Gemini ──
+export async function processExcelInventory(sheetData, targetType = 'raw') {
+    const schemaRaw = `{ "name": string, "sku": string|null, "stock": number, "unit": string (default "pcs"), "supplier_name": string|null }`;
+    const schemaListed = `{ "name": string, "sku": string|null, "price": number, "stock": number, "unit": string (default "pcs"), "platform": string|null, "category": string|null }`;
+
+    const schema = targetType === 'raw' ? schemaRaw : schemaListed;
+    const tableName = targetType === 'raw' ? 'inventory_raw (Raw Materials)' : 'inventory_listed (Listed Products)';
+
+    const prompt = `You are an inventory data parser. Given this spreadsheet data (JSON array of row objects), extract ALL items and return them as a JSON array for ${tableName}.
+
+Output schema per item: ${schema}
+
+Column mapping rules:
+- Any column with "item", "name", "product", "material", "raw", "listed" in its header → "name"
+- "qty", "quantity", "amount", "count" → "stock"  
+- "rate", "cost", "mrp", "price" → "price" (strip ₹/$/Rs symbols, number only)
+- "vendor", "supplier" → "supplier_name"
+- "sku", "code", "id" → "sku"
+- "unit" → "unit"
+- "platform" → "platform"
+- "category", "type" → "category"
+
+SKU rule: If no SKU column exists in input, generate a random SKU for each item in format "SKU-XXXXX" where X is uppercase alphanumeric (e.g. "SKU-A8F3K"). Every item MUST have a sku value.
+
+IMPORTANT: Return ONLY a raw JSON array. No markdown, no backticks, no explanation. Example: [{"name":"Nails","sku":"SKU-R9K2M","stock":100,"unit":"pcs"}]
+
+Input data:
+${JSON.stringify(sheetData)}`;
+
+    const res = await fetch(GEMINI_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 8192,
+            },
+        }),
+    });
+
+    const data = await res.json();
+    console.log('[Excel AI] Gemini raw response:', data);
+
+    if (data.error) {
+        throw new Error(`Gemini API: ${data.error.message || JSON.stringify(data.error)}`);
+    }
+
+    if (data.candidates && data.candidates.length > 0) {
+        let text = data.candidates[0].content?.parts?.[0]?.text || '[]';
+        console.log('[Excel AI] Gemini text:', text);
+        // Strip markdown code fences if present
+        text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+        try {
+            return JSON.parse(text);
+        } catch (parseErr) {
+            console.error('[Excel AI] JSON parse failed on:', text);
+            throw new Error(`AI returned invalid JSON: ${text.slice(0, 200)}`);
+        }
+    }
+
+    throw new Error('No response from Gemini AI');
+}
+
 // ── Enhance product description with AI ──
 export async function enhanceProductDescription(productName, category) {
     try {

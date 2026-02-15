@@ -5,7 +5,7 @@ import {
     Store,
     MapPin,
     Clock,
-    DollarSign,
+    IndianRupee,
     X,
     Check,
     Send,
@@ -170,7 +170,7 @@ const PropagationPanel = () => {
           id: r.id,
           company: r.merchant_profiles?.business_name || 'Unknown Seller',
           item: r.item_name,
-          price: `$${Number(r.price).toFixed(2)}`,
+          price: `₹${Number(r.price).toFixed(2)}`,
           distance: r.distance_km ? `${r.distance_km} km` : '-',
           delivery: r.delivery_days ? `${r.delivery_days} Days` : '-',
           verified: true,
@@ -304,7 +304,7 @@ const PropagationPanel = () => {
                                                     id: r.id,
                                                     company: r.merchant_profiles?.business_name || 'Unknown Seller',
                                                     item: r.item_name,
-                                                    price: `$${Number(r.price).toFixed(2)}`,
+                                                    price: `₹${Number(r.price).toFixed(2)}`,
                                                     distance: r.distance_km ? `${r.distance_km} km` : '-',
                                                     delivery: r.delivery_days ? `${r.delivery_days} Days` : '-',
                                                     verified: true,
@@ -413,14 +413,14 @@ const PropagationPanel = () => {
                                         <div>
                                             <label className="text-xs font-bold text-[#6b4c59] uppercase mb-2 block">Min Price</label>
                                             <div className="relative">
-                                                <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                                <IndianRupee size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                                 <input type="number" placeholder="0.00" className="w-full pl-8 py-3.5 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-[#59112e] focus:bg-white transition-all font-bold text-[#2d0b16]" />
                                             </div>
                                         </div>
                                         <div>
                                             <label className="text-xs font-bold text-[#6b4c59] uppercase mb-2 block">Max Price</label>
                                             <div className="relative">
-                                                <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                                                <IndianRupee size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                                                 <input type="number" placeholder="0.00" className="w-full pl-8 py-3.5 bg-gray-50 rounded-xl border border-gray-200 outline-none focus:border-[#59112e] focus:bg-white transition-all font-bold text-[#2d0b16]" />
                                             </div>
                                         </div>
